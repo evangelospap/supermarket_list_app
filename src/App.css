@@ -92,8 +92,8 @@ h1 {
 .stats {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(3, minmax(104px, 1fr));
-  min-width: 384px;
+  grid-template-columns: repeat(4, minmax(104px, 1fr));
+  min-width: 512px;
 }
 
 .stat-card {
@@ -300,7 +300,7 @@ button:focus-visible {
   border-radius: 4px;
   display: grid;
   gap: 2px;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   padding: 2px;
 }
 
@@ -468,7 +468,7 @@ button:focus-visible {
   border-bottom: 1px solid #eeeeee;
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(140px, 1fr) minmax(118px, 150px) auto;
+  grid-template-columns: minmax(140px, 1fr) 72px auto;
   min-height: 40px;
   padding: 6px 10px;
 }
@@ -481,7 +481,7 @@ button:focus-visible {
   border-bottom: 0;
 }
 
-.item-row label {
+.item-row .item-check {
   align-items: center;
   display: flex;
   gap: 10px;
@@ -500,12 +500,23 @@ button:focus-visible {
 }
 
 .item-name {
+  flex: 1 1 auto;
   font-size: 0.9rem;
-  min-width: 0;
-  overflow-wrap: anywhere;
+  line-height: 1.25;
+  min-width: 7rem;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
-.have-toggle {
+.item-actions {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.have-toggle,
+.not-needed-toggle {
   align-items: center;
   background: var(--surface-muted);
   border: 1px solid var(--border);
@@ -517,16 +528,32 @@ button:focus-visible {
   font-weight: 800;
   gap: 6px;
   line-height: 1;
+  min-height: 26px;
   padding: 4px 6px;
   white-space: nowrap;
 }
 
-.item-row.have {
+.not-needed-toggle {
+  background: var(--surface);
+  border-color: #e5d2c9;
+  color: #8a4b2d;
+}
+
+.not-needed-toggle:hover,
+.not-needed-toggle.active {
+  background: #fff1e8;
+  border-color: #e4b79e;
+  color: #7b3518;
+}
+
+.item-row.have,
+.item-row.notNeeded {
   background: var(--surface-muted);
   opacity: 0.72;
 }
 
-.item-row.have .item-name {
+.item-row.have .item-name,
+.item-row.notNeeded .item-name {
   color: #7b8177;
   text-decoration: line-through;
 }
@@ -536,16 +563,112 @@ button:focus-visible {
   border-color: #d7e8d1;
   color: var(--primary-strong);
 }
+.item-row.have {
+  grid-template-columns: minmax(0, 1fr) 72px auto;
+  grid-template-rows: auto auto;
+}
 
-.item-row select {
-  color: var(--text);
+.item-row.have .item-check {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.item-row.have .category-select-field {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.item-row.have .quantity-field {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: start;
+  max-width: 180px;
+  width: min(100%, 180px);
+}
+
+.item-row.have .delete-button {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.quantity-field {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.quantity-field span {
+  color: var(--text-muted);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.quantity-field input {
   font-size: 0.78rem;
   min-height: 32px;
   padding: 4px 8px;
+}
+
+.item-row.notNeeded .not-needed-toggle {
+  background: #fff1e8;
+  border-color: #e4b79e;
+  color: #7b3518;
+}
+
+.category-select-field {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 800;
+  height: 32px;
+  justify-content: center;
+  line-height: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 18px 0 8px;
+  position: relative;
+  text-transform: none;
+  width: 72px;
+}
+
+.category-select-field::after {
+  color: var(--text-muted);
+  content: "⌄";
+  font-size: 0.8rem;
+  pointer-events: none;
+  position: absolute;
+  right: 7px;
+  top: 8px;
+}
+
+.category-select-field:hover,
+.category-select-field:focus-within {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-strong);
+}
+
+.category-select-field span {
+  pointer-events: none;
+}
+
+.category-select-field select {
+  cursor: pointer;
+  inset: 0;
+  opacity: 0;
+  position: absolute;
   width: 100%;
 }
 
-.item-row select option {
+.category-select-field select option {
   background: var(--surface);
   color: var(--text);
 }
@@ -717,10 +840,6 @@ button:focus-visible {
     align-items: flex-start;
   }
 
-  .item-row select {
-    color: var(--text);
-    width: 100%;
-  }
 
   .quick-add-form {
     grid-template-columns: 1fr;
@@ -728,5 +847,106 @@ button:focus-visible {
 
   .modal-actions {
     display: grid;
+  }
+}
+/* Phone product rows: keep the product name primary, and make actions compact. */
+@media (max-width: 620px) {
+  .category-card {
+    border-radius: 4px;
+  }
+
+  .category-card header {
+    align-items: center;
+    min-height: 48px;
+    padding: 8px 10px;
+  }
+
+  .category-card h2 {
+    font-size: 0.95rem;
+  }
+
+  .item-row {
+    align-items: center;
+    column-gap: 8px;
+    grid-template-columns: minmax(0, 1fr) 72px 34px;
+    grid-template-rows: auto;
+    min-height: 0;
+    padding: 10px;
+    row-gap: 8px;
+  }
+
+  .item-row label {
+    gap: 8px;
+  }
+
+  .item-check {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .item-name {
+    flex: 1 1 auto;
+    font-size: 0.96rem;
+    font-weight: 800;
+    line-height: 1.25;
+    min-width: 8rem;
+  }
+
+  .item-actions {
+    gap: 5px;
+  }
+
+  .have-toggle,
+  .not-needed-toggle {
+    border-color: #d8d8d8;
+    font-size: 0.66rem;
+    gap: 5px;
+    min-height: 26px;
+    padding: 4px 6px;
+  }
+
+  .have-toggle input[type="checkbox"] {
+    height: 14px;
+    width: 14px;
+  }
+
+  .category-select-field,
+  .item-row.have .category-select-field {
+    grid-column: 2;
+    grid-row: 1;
+    width: 72px;
+  }
+
+  .item-row.have {
+    grid-template-columns: minmax(0, 1fr) 72px 34px;
+    grid-template-rows: auto auto;
+  }
+
+  .quantity-field,
+  .item-row.have .quantity-field {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: start;
+    max-width: 230px;
+    width: min(100%, 230px);
+  }
+  .delete-button {
+    align-self: start;
+    border-color: #efc9c2;
+    display: inline-flex;
+    font-size: 1rem;
+    grid-column: 3;
+    grid-row: 1;
+    height: 32px;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0;
+    width: 32px;
+  }
+
+  .item-row.have .item-name,
+  .item-row.notNeeded .item-name {
+    color: #7b8177;
   }
 }

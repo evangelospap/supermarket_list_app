@@ -179,7 +179,13 @@ function isValidState(value) {
     value &&
     Array.isArray(value.categories) &&
     Array.isArray(value.items) &&
-    value.items.every((item) => item.id && item.name && item.category && item.status)
+    value.items.every((item) =>
+      item.id &&
+      item.name &&
+      item.category &&
+      (item.status === "needed" || item.status === "notNeeded" || item.status === "have") &&
+      (item.quantity === undefined || typeof item.quantity === "string"),
+    )
   );
 }
 
@@ -209,6 +215,10 @@ function DashboardHeader({ totals }) {
         <span className="stat-card">
           <small>Χρειάζομαι</small>
           <strong>{totals.needed}</strong>
+        </span>
+        <span className="stat-card">
+          <small>Δεν το χρειάζομαι</small>
+          <strong>{totals.notNeeded}</strong>
         </span>
         <span className="stat-card">
           <small>Έχω σπίτι</small>
@@ -291,6 +301,9 @@ function FilterPanel({ query, view, onQueryChange, onViewChange }) {
       <div className="segmented" aria-label="Φίλτρο κατάστασης">
         <button className={view === "all" ? "active" : ""} type="button" onClick={() => onViewChange("all")}>
           Όλα
+        </button>
+        <button className={view === "notNeeded" ? "active" : ""} type="button" onClick={() => onViewChange("notNeeded")}>
+          Δεν το χρειάζομαι
         </button>
         <button className={view === "needed" ? "active" : ""} type="button" onClick={() => onViewChange("needed")}>
           Χρειάζομαι
@@ -561,34 +574,68 @@ function ControlsPanel({
   );
 }
 
-// One row owns all item-level actions: status toggle, recategorize, and delete request.
-function ItemRow({ categories, item, onRequestRemoveItem, onToggleItemStatus, onUpdateItemCategory }) {
+// One row owns all item-level actions: status toggles, recategorize, and delete request.
+function ItemRow({
+  categories,
+  item,
+  view,
+  onRequestRemoveItem,
+  onToggleItemStatus,
+  onToggleNotNeededStatus,
+  onUpdateItemCategory,
+  onUpdateItemQuantity,
+}) {
   return (
     <div className={`item-row ${item.status}`}>
-      <label className="item-check">
+      <div className="item-check">
         <span className="item-name">{item.name}</span>
-        <span className="have-toggle">
-          <input
-            aria-label={`${item.status === "have" ? "Αφαίρεση από Έχω σπίτι" : "Σήμανση ως Έχω σπίτι"}: ${item.name}`}
-            checked={item.status === "have"}
-            onChange={() => onToggleItemStatus(item.id)}
-            type="checkbox"
-          />
-          <span>Το 'χω!</span>
+        <span className="item-actions">
+          <span className="have-toggle">
+            <input
+              aria-label={`${item.status === "have" ? "Αφαίρεση από Έχω σπίτι" : "Σήμανση ως Έχω σπίτι"}: ${item.name}`}
+              checked={item.status === "have"}
+              onChange={() => onToggleItemStatus(item.id)}
+              type="checkbox"
+            />
+            <span>Το 'χω!</span>
+          </span>
+          <button
+            aria-pressed={item.status === "notNeeded"}
+            className={`not-needed-toggle ${item.status === "notNeeded" ? "active" : ""}`}
+            type="button"
+            onClick={() => onToggleNotNeededStatus(item.id)}
+          >
+            Δεν θέλω
+          </button>
         </span>
-      </label>
+      </div>
 
-      <select
-        aria-label={`Αλλαγή κατηγορίας για ${item.name}`}
-        value={item.category}
-        onChange={(event) => onUpdateItemCategory(item.id, event.target.value)}
-      >
-        {categories.map((category) => (
-          <option key={category} value={category}>
-            {category}
-          </option>
-        ))}
-      </select>
+      {/* <label className="category-select-field" title={item.category}>
+        <span>Κατηγ.</span>
+        <select
+          aria-label={`Αλλαγή κατηγορίας για ${item.name}`}
+          value={item.category}
+          onChange={(event) => onUpdateItemCategory(item.id, event.target.value)}
+        >
+          {categories.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </select>
+      </label> */}
+
+      {item.status === "have" && view === "have" ? (
+        <label className="quantity-field">
+          <span>Ποσότητα</span>
+          <input
+            aria-label={`Ποσότητα για ${item.name}`}
+            value={item.quantity ?? ""}
+            onChange={(event) => onUpdateItemQuantity(item.id, event.target.value)}
+            placeholder="π.χ. 500γρ"
+          />
+        </label>
+      ) : null}
 
       <button
         aria-label={`Διαγραφή ${item.name}`}
@@ -606,14 +653,17 @@ function ItemRow({ categories, item, onRequestRemoveItem, onToggleItemStatus, on
 function CategoryCard({
   categories,
   group,
+  view,
   quickAddCategory,
   quickAddName,
   onAddItemToCategory,
   onQuickAddNameChange,
   onRequestRemoveItem,
   onToggleItemStatus,
+  onToggleNotNeededStatus,
   onToggleQuickAdd,
   onUpdateItemCategory,
+  onUpdateItemQuantity,
 }) {
   return (
     <article className="category-card">
@@ -658,9 +708,12 @@ function CategoryCard({
             categories={categories}
             item={item}
             key={item.id}
+            view={view}
             onRequestRemoveItem={onRequestRemoveItem}
             onToggleItemStatus={onToggleItemStatus}
+            onToggleNotNeededStatus={onToggleNotNeededStatus}
             onUpdateItemCategory={onUpdateItemCategory}
+            onUpdateItemQuantity={onUpdateItemQuantity}
           />
         ))}
       </div>
@@ -672,14 +725,17 @@ function CategoryCard({
 function ShoppingList({
   categories,
   itemsByCategory,
+  view,
   quickAddCategory,
   quickAddName,
   onAddItemToCategory,
   onQuickAddNameChange,
   onRequestRemoveItem,
   onToggleItemStatus,
+  onToggleNotNeededStatus,
   onToggleQuickAdd,
   onUpdateItemCategory,
+  onUpdateItemQuantity,
 }) {
   if (itemsByCategory.length === 0) {
     return (
@@ -699,14 +755,17 @@ function ShoppingList({
           categories={categories}
           group={group}
           key={group.category}
+          view={view}
           quickAddCategory={quickAddCategory}
           quickAddName={quickAddName}
           onAddItemToCategory={onAddItemToCategory}
           onQuickAddNameChange={onQuickAddNameChange}
           onRequestRemoveItem={onRequestRemoveItem}
           onToggleItemStatus={onToggleItemStatus}
+          onToggleNotNeededStatus={onToggleNotNeededStatus}
           onToggleQuickAdd={onToggleQuickAdd}
           onUpdateItemCategory={onUpdateItemCategory}
+          onUpdateItemQuantity={onUpdateItemQuantity}
         />
       ))}
     </section>
@@ -833,7 +892,7 @@ function App() {
         acc.all += 1;
         return acc;
       },
-      { all: 0, needed: 0, have: 0 },
+      { all: 0, needed: 0, notNeeded: 0, have: 0 },
     );
   }, [state.items]);
 
@@ -940,7 +999,16 @@ function App() {
     setState((current) => ({
       ...current,
       items: current.items.map((item) =>
-        item.id === itemId ? { ...item, status: item.status === "needed" ? "have" : "needed" } : item,
+        item.id === itemId ? { ...item, status: item.status === "have" ? "needed" : "have" } : item,
+      ),
+    }));
+  }
+
+  function toggleNotNeededStatus(itemId) {
+    setState((current) => ({
+      ...current,
+      items: current.items.map((item) =>
+        item.id === itemId ? { ...item, status: item.status === "notNeeded" ? "needed" : "notNeeded" } : item,
       ),
     }));
   }
@@ -949,6 +1017,13 @@ function App() {
     setState((current) => ({
       ...current,
       items: current.items.map((item) => (item.id === itemId ? { ...item, category } : item)),
+    }));
+  }
+
+  function updateItemQuantity(itemId, quantity) {
+    setState((current) => ({
+      ...current,
+      items: current.items.map((item) => (item.id === itemId ? { ...item, quantity } : item)),
     }));
   }
 
@@ -1008,14 +1083,17 @@ function App() {
         <ShoppingList
           categories={state.categories}
           itemsByCategory={itemsByCategory}
+          view={view}
           quickAddCategory={quickAddCategory}
           quickAddName={quickAddName}
           onAddItemToCategory={addItemToCategory}
           onQuickAddNameChange={setQuickAddName}
           onRequestRemoveItem={setPendingDeleteItem}
           onToggleItemStatus={toggleItemStatus}
+          onToggleNotNeededStatus={toggleNotNeededStatus}
           onToggleQuickAdd={toggleQuickAdd}
           onUpdateItemCategory={updateItemCategory}
+          onUpdateItemQuantity={updateItemQuantity}
         />
       </section>
 

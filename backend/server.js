@@ -83,7 +83,8 @@ function isValidState(value) {
         typeof item.id === "string" &&
         typeof item.name === "string" &&
         typeof item.category === "string" &&
-        (item.status === "needed" || item.status === "have"),
+        (item.status === "needed" || item.status === "notNeeded" || item.status === "have") &&
+        (item.quantity === undefined || typeof item.quantity === "string"),
     )
   );
 }
