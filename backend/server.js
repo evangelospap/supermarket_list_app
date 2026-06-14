@@ -104,10 +104,10 @@ async function readState() {
 }
 
 // Write through a temporary file, then rename, so a crash is less likely to corrupt the JSON DB.
-async function writeState(state) {
+async function writeState(state, updatedAt = new Date().toISOString()) {
   const payload = {
     state,
-    updatedAt: new Date().toISOString(),
+    updatedAt,
   };
   const tempFile = `${STATE_FILE}.tmp`;
 
@@ -270,7 +270,15 @@ const server = createServer(async (request, response) => {
         return;
       }
 
-      const savedPayload = await writeState(payload.state);
+      const requestedUpdatedAt = typeof payload.updatedAt === "string" ? payload.updatedAt : new Date().toISOString();
+      const currentPayload = await readState();
+
+      if (currentPayload?.updatedAt && currentPayload.updatedAt > requestedUpdatedAt) {
+        sendJson(response, 200, currentPayload);
+        return;
+      }
+
+      const savedPayload = await writeState(payload.state, requestedUpdatedAt);
       sendJson(response, 200, savedPayload);
       return;
     }

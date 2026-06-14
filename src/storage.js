@@ -6,6 +6,34 @@ const STATE_KEY = "current";
 const LEGACY_STORAGE_KEY = "supermarket-list-state-v1";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
+function buildStoredPayload(state, updatedAt = new Date().toISOString()) {
+  return { state, updatedAt };
+}
+
+function normalizeStoredPayload(payload) {
+  if (!payload) {
+    return undefined;
+  }
+
+  if (payload.state) {
+    return buildStoredPayload(payload.state, payload.updatedAt ?? "");
+  }
+
+  return buildStoredPayload(payload, "");
+}
+
+function isNewerPayload(candidate, current) {
+  if (!candidate) {
+    return false;
+  }
+
+  if (!current) {
+    return true;
+  }
+
+  return String(candidate.updatedAt ?? "") > String(current.updatedAt ?? "");
+}
+
 // Backend state is the source of truth when the app is used from multiple devices/browsers.
 async function readFromBackend() {
   const response = await fetch(`${API_BASE_URL}/api/state`, {
@@ -21,13 +49,14 @@ async function readFromBackend() {
   }
 
   const payload = await response.json();
-  return payload.state;
+  return normalizeStoredPayload(payload);
 }
 
 // Every list change is sent as a full state document to keep the API simple.
-async function writeToBackend(state) {
+async function writeToBackend(payload) {
+  const normalizedPayload = normalizeStoredPayload(payload);
   const response = await fetch(`${API_BASE_URL}/api/state`, {
-    body: JSON.stringify({ state }),
+    body: JSON.stringify(normalizedPayload),
     headers: { "Content-Type": "application/json" },
     method: "PUT",
   });
@@ -35,6 +64,8 @@ async function writeToBackend(state) {
   if (!response.ok) {
     throw new Error("Could not save backend state");
   }
+
+  return normalizeStoredPayload(await response.json());
 }
 
 function canUseIndexedDb() {
@@ -72,7 +103,7 @@ function readFromIndexedDb() {
         const store = transaction.objectStore(STORE_NAME);
         const request = store.get(STATE_KEY);
 
-        request.onsuccess = () => resolve(request.result);
+        request.onsuccess = () => resolve(normalizeStoredPayload(request.result));
         request.onerror = () => reject(request.error);
         transaction.oncomplete = () => db.close();
         transaction.onerror = () => {
@@ -84,13 +115,13 @@ function readFromIndexedDb() {
   });
 }
 
-function writeToIndexedDb(state) {
+function writeToIndexedDb(payload) {
   return new Promise((resolve, reject) => {
     openDatabase()
       .then((db) => {
         const transaction = db.transaction(STORE_NAME, "readwrite");
         const store = transaction.objectStore(STORE_NAME);
-        const request = store.put(state, STATE_KEY);
+        const request = store.put(payload, STATE_KEY);
 
         request.onsuccess = () => resolve();
         request.onerror = () => reject(request.error);
@@ -108,78 +139,93 @@ function writeToIndexedDb(state) {
 function readFromLocalStorage() {
   try {
     const stored = localStorage.getItem(LEGACY_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : undefined;
+    return stored ? normalizeStoredPayload(JSON.parse(stored)) : undefined;
   } catch {
     return undefined;
   }
 }
 
-function writeToLocalStorage(state) {
-  localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(state));
+function writeToLocalStorage(payload) {
+  localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(payload));
+}
+
+async function readFromBrowserCache() {
+  let indexedState;
+
+  try {
+    indexedState = await readFromIndexedDb();
+  } catch {
+    // localStorage is the last fallback below.
+  }
+
+  const localState = readFromLocalStorage();
+
+  if (isNewerPayload(localState, indexedState)) {
+    return { source: "localstorage", payload: localState };
+  }
+
+  return { source: indexedState ? "indexeddb" : localState ? "localstorage" : "empty", payload: indexedState ?? localState };
 }
 
 // Load order also migrates older local data up to the backend whenever possible.
 export async function loadStoredState() {
   try {
-    const backendState = await readFromBackend();
+    const backendPayload = await readFromBackend();
+    const browserResult = await readFromBrowserCache();
+    const browserPayload = browserResult.payload;
 
-    if (backendState) {
-      await writeToIndexedDb(backendState);
-      writeToLocalStorage(backendState);
-      return { source: "backend", state: backendState };
+    if (isNewerPayload(browserPayload, backendPayload)) {
+      await writeToBackend(browserPayload);
+      return { source: browserResult.source, state: browserPayload.state };
+    }
+
+    if (backendPayload) {
+      await writeToIndexedDb(backendPayload);
+      writeToLocalStorage(backendPayload);
+      return { source: "backend", state: backendPayload.state };
     }
   } catch {
-    try {
-      const indexedState = await readFromIndexedDb();
-
-      if (indexedState) {
-        return { source: "indexeddb", state: indexedState };
-      }
-    } catch {
-      const localState = readFromLocalStorage();
-      return { source: localState ? "localstorage" : "empty", state: localState };
-    }
+    const browserResult = await readFromBrowserCache();
+    return { source: browserResult.source, state: browserResult.payload?.state };
   }
 
   try {
-    const indexedState = await readFromIndexedDb();
+    const browserResult = await readFromBrowserCache();
+    const browserPayload = browserResult.payload;
 
-    if (indexedState) {
-      await writeToBackend(indexedState);
-      return { source: "indexeddb", state: indexedState };
-    }
-
-    const legacyState = readFromLocalStorage();
-
-    if (legacyState) {
-      await writeToIndexedDb(legacyState);
-      await writeToBackend(legacyState);
-      return { source: "localstorage", state: legacyState };
+    if (browserPayload) {
+      const backendPayload = await writeToBackend(browserPayload);
+      await writeToIndexedDb(backendPayload);
+      writeToLocalStorage(backendPayload);
+      return { source: browserResult.source, state: browserPayload.state };
     }
   } catch {
-    const localState = readFromLocalStorage();
-    return { source: localState ? "localstorage" : "empty", state: localState };
+    const browserResult = await readFromBrowserCache();
+    return { source: browserResult.source, state: browserResult.payload?.state };
   }
 
   return { source: "empty", state: undefined };
 }
 
-// Save order mirrors load order: backend first, browser caches second.
+// Save locally first so a quick refresh does not lose the latest checkbox/action.
 export async function saveStoredState(state) {
+  const localPayload = buildStoredPayload(state);
+
+  writeToLocalStorage(localPayload);
+
   try {
-    await writeToBackend(state);
-    await writeToIndexedDb(state);
-    writeToLocalStorage(state);
+    await writeToIndexedDb(localPayload);
+  } catch {
+    // localStorage already has the newest copy.
+  }
+
+  try {
+    const backendPayload = await writeToBackend(localPayload);
+    await writeToIndexedDb(backendPayload);
+    writeToLocalStorage(backendPayload);
     return "backend";
   } catch {
-    try {
-      await writeToIndexedDb(state);
-      writeToLocalStorage(state);
-      return "indexeddb";
-    } catch {
-      writeToLocalStorage(state);
-      return "localstorage";
-    }
+    return "localstorage";
   }
 }
 

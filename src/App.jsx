@@ -382,8 +382,18 @@ function ProductScanner({ categories, onAddScannedItem }) {
     let cancelled = false;
 
     async function startCameraScanner() {
-      if (!("BarcodeDetector" in window) || !navigator.mediaDevices?.getUserMedia) {
-        setCameraMessage("Ο browser δεν υποστηρίζει camera barcode scan. Χρησιμοποίησε το πεδίο κωδικού από κάτω.");
+      if (!window.isSecureContext) {
+        setCameraMessage("Η κάμερα θέλει HTTPS ή localhost. Με απλό http από κινητό χρησιμοποίησε το πεδίο κωδικού.");
+        return;
+      }
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setCameraMessage("Ο browser δεν δίνει πρόσβαση στην κάμερα. Χρησιμοποίησε το πεδίο κωδικού από κάτω.");
+        return;
+      }
+
+      if (!("BarcodeDetector" in window)) {
+        setCameraMessage("Ο browser έχει κάμερα, αλλά δεν έχει ενσωματωμένο barcode scanner. Σε Firefox γράψε τον κωδικό από κάτω.");
         return;
       }
 
@@ -792,6 +802,7 @@ function App() {
   const [query, setQuery] = useState("");
   const [view, setView] = useState("all");
   const [pendingDeleteItem, setPendingDeleteItem] = useState(null);
+  const didFinishInitialLoad = useRef(false);
 
   // Load server/browser persisted state once, then let React own the live edits.
   useEffect(() => {
@@ -823,6 +834,11 @@ function App() {
   // Save every list/category change after the initial state has loaded.
   useEffect(() => {
     if (!storageReady) {
+      return;
+    }
+
+    if (!didFinishInitialLoad.current) {
+      didFinishInitialLoad.current = true;
       return;
     }
 
