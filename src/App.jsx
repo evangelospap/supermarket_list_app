@@ -574,15 +574,13 @@ function ControlsPanel({
   );
 }
 
-// One row owns all item-level actions: status toggles, recategorize, and delete request.
+// One row owns all item-level actions: status toggles, quantity, and delete request.
 function ItemRow({
-  categories,
   item,
   view,
   onRequestRemoveItem,
   onToggleItemStatus,
   onToggleNotNeededStatus,
-  onUpdateItemCategory,
   onUpdateItemQuantity,
 }) {
   return (
@@ -610,21 +608,6 @@ function ItemRow({
         </span>
       </div>
 
-      {/* <label className="category-select-field" title={item.category}>
-        <span>Κατηγ.</span>
-        <select
-          aria-label={`Αλλαγή κατηγορίας για ${item.name}`}
-          value={item.category}
-          onChange={(event) => onUpdateItemCategory(item.id, event.target.value)}
-        >
-          {categories.map((category) => (
-            <option key={category} value={category}>
-              {category}
-            </option>
-          ))}
-        </select>
-      </label> */}
-
       {item.status === "have" && view === "have" ? (
         <label className="quantity-field">
           <span>Ποσότητα</span>
@@ -651,7 +634,6 @@ function ItemRow({
 
 // A category card renders its quick-add form only when this category is active.
 function CategoryCard({
-  categories,
   group,
   view,
   quickAddCategory,
@@ -662,7 +644,6 @@ function CategoryCard({
   onToggleItemStatus,
   onToggleNotNeededStatus,
   onToggleQuickAdd,
-  onUpdateItemCategory,
   onUpdateItemQuantity,
 }) {
   return (
@@ -705,14 +686,12 @@ function CategoryCard({
 
         {group.items.map((item) => (
           <ItemRow
-            categories={categories}
             item={item}
             key={item.id}
             view={view}
             onRequestRemoveItem={onRequestRemoveItem}
             onToggleItemStatus={onToggleItemStatus}
             onToggleNotNeededStatus={onToggleNotNeededStatus}
-            onUpdateItemCategory={onUpdateItemCategory}
             onUpdateItemQuantity={onUpdateItemQuantity}
           />
         ))}
@@ -723,7 +702,6 @@ function CategoryCard({
 
 // The list area decides whether to show empty state or grouped category cards.
 function ShoppingList({
-  categories,
   itemsByCategory,
   view,
   quickAddCategory,
@@ -734,7 +712,6 @@ function ShoppingList({
   onToggleItemStatus,
   onToggleNotNeededStatus,
   onToggleQuickAdd,
-  onUpdateItemCategory,
   onUpdateItemQuantity,
 }) {
   if (itemsByCategory.length === 0) {
@@ -752,7 +729,6 @@ function ShoppingList({
     <section className="list-area" aria-label="Λίστα προϊόντων">
       {itemsByCategory.map((group) => (
         <CategoryCard
-          categories={categories}
           group={group}
           key={group.category}
           view={view}
@@ -764,7 +740,6 @@ function ShoppingList({
           onToggleItemStatus={onToggleItemStatus}
           onToggleNotNeededStatus={onToggleNotNeededStatus}
           onToggleQuickAdd={onToggleQuickAdd}
-          onUpdateItemCategory={onUpdateItemCategory}
           onUpdateItemQuantity={onUpdateItemQuantity}
         />
       ))}
@@ -1013,13 +988,6 @@ function App() {
     }));
   }
 
-  function updateItemCategory(itemId, category) {
-    setState((current) => ({
-      ...current,
-      items: current.items.map((item) => (item.id === itemId ? { ...item, category } : item)),
-    }));
-  }
-
   function updateItemQuantity(itemId, quantity) {
     setState((current) => ({
       ...current,
@@ -1081,7 +1049,6 @@ function App() {
         />
 
         <ShoppingList
-          categories={state.categories}
           itemsByCategory={itemsByCategory}
           view={view}
           quickAddCategory={quickAddCategory}
@@ -1092,7 +1059,6 @@ function App() {
           onToggleItemStatus={toggleItemStatus}
           onToggleNotNeededStatus={toggleNotNeededStatus}
           onToggleQuickAdd={toggleQuickAdd}
-          onUpdateItemCategory={updateItemCategory}
           onUpdateItemQuantity={updateItemQuantity}
         />
       </section>

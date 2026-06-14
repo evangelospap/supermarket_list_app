@@ -468,7 +468,7 @@ button:focus-visible {
   border-bottom: 1px solid #eeeeee;
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(140px, 1fr) 72px auto;
+  grid-template-columns: minmax(140px, 1fr) auto;
   min-height: 40px;
   padding: 6px 10px;
 }
@@ -564,17 +564,12 @@ button:focus-visible {
   color: var(--primary-strong);
 }
 .item-row.have {
-  grid-template-columns: minmax(0, 1fr) 72px auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
 }
 
 .item-row.have .item-check {
   grid-column: 1;
-  grid-row: 1;
-}
-
-.item-row.have .category-select-field {
-  grid-column: 2;
   grid-row: 1;
 }
 
@@ -587,7 +582,7 @@ button:focus-visible {
 }
 
 .item-row.have .delete-button {
-  grid-column: 3;
+  grid-column: 2;
   grid-row: 1;
 }
 
@@ -616,61 +611,6 @@ button:focus-visible {
   background: #fff1e8;
   border-color: #e4b79e;
   color: #7b3518;
-}
-
-.category-select-field {
-  align-items: center;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: inline-flex;
-  font-size: 0.72rem;
-  font-weight: 800;
-  height: 32px;
-  justify-content: center;
-  line-height: 1;
-  min-width: 0;
-  overflow: hidden;
-  padding: 0 18px 0 8px;
-  position: relative;
-  text-transform: none;
-  width: 72px;
-}
-
-.category-select-field::after {
-  color: var(--text-muted);
-  content: "⌄";
-  font-size: 0.8rem;
-  pointer-events: none;
-  position: absolute;
-  right: 7px;
-  top: 8px;
-}
-
-.category-select-field:hover,
-.category-select-field:focus-within {
-  background: var(--primary-soft);
-  border-color: var(--primary);
-  color: var(--primary-strong);
-}
-
-.category-select-field span {
-  pointer-events: none;
-}
-
-.category-select-field select {
-  cursor: pointer;
-  inset: 0;
-  opacity: 0;
-  position: absolute;
-  width: 100%;
-}
-
-.category-select-field select option {
-  background: var(--surface);
-  color: var(--text);
 }
 
 .delete-button {
@@ -868,7 +808,7 @@ button:focus-visible {
   .item-row {
     align-items: center;
     column-gap: 8px;
-    grid-template-columns: minmax(0, 1fr) 72px 34px;
+    grid-template-columns: minmax(0, 1fr) 34px;
     grid-template-rows: auto;
     min-height: 0;
     padding: 10px;
@@ -911,15 +851,8 @@ button:focus-visible {
     width: 14px;
   }
 
-  .category-select-field,
-  .item-row.have .category-select-field {
-    grid-column: 2;
-    grid-row: 1;
-    width: 72px;
-  }
-
   .item-row.have {
-    grid-template-columns: minmax(0, 1fr) 72px 34px;
+    grid-template-columns: minmax(0, 1fr) 34px;
     grid-template-rows: auto auto;
   }
 
@@ -936,7 +869,7 @@ button:focus-visible {
     border-color: #efc9c2;
     display: inline-flex;
     font-size: 1rem;
-    grid-column: 3;
+    grid-column: 2;
     grid-row: 1;
     height: 32px;
     justify-content: center;
