@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, "..");
 const DIST_DIR = path.join(ROOT_DIR, "dist");
+// The backend stores the shared list in one JSON file so every device sees the same state.
 const STATE_FILE = process.env.STATE_FILE
   ? path.resolve(process.env.STATE_FILE)
   : path.join(ROOT_DIR, "data", "supermarket-state.json");
@@ -13,6 +14,7 @@ const DATA_DIR = path.dirname(STATE_FILE);
 const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? "0.0.0.0";
 const MAX_BODY_BYTES = 1024 * 1024;
+const PRODUCT_LOOKUP_TIMEOUT_MS = 6000;
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
@@ -22,6 +24,7 @@ const MIME_TYPES = {
   ".svg": "image/svg+xml",
 };
 
+// All API responses share permissive CORS because the Vite dev server and backend run on different ports.
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "Access-Control-Allow-Headers": "Content-Type",
@@ -41,6 +44,7 @@ function sendEmpty(response, statusCode) {
   response.end();
 }
 
+// In production the same Node server also serves the Vite build from /dist.
 async function sendStaticFile(response, pathname) {
   const requestedPath = pathname === "/" ? "/index.html" : pathname;
   const filePath = path.resolve(DIST_DIR, `.${requestedPath}`);
@@ -68,6 +72,7 @@ async function sendStaticFile(response, pathname) {
   }
 }
 
+// Keep state validation small but strict enough to avoid writing broken list data to disk.
 function isValidState(value) {
   return (
     value &&
@@ -97,6 +102,7 @@ async function readState() {
   }
 }
 
+// Write through a temporary file, then rename, so a crash is less likely to corrupt the JSON DB.
 async function writeState(state) {
   const payload = {
     state,
@@ -111,6 +117,94 @@ async function writeState(state) {
   return payload;
 }
 
+// QR codes may contain URLs or text; product barcodes are usually the 8-14 digit sequence inside.
+function extractScannableCode(value) {
+  const text = String(value ?? "").trim();
+  const digitMatch = text.match(/\b\d{8,14}\b/);
+
+  return digitMatch?.[0] ?? text;
+}
+
+function pickText(...values) {
+  return values.find((value) => typeof value === "string" && value.trim())?.trim() ?? "";
+}
+
+// Flatten Open Food Facts into the tiny shape the frontend needs for the stage-2 confirmation UI.
+function buildProductPayload(code, product) {
+  const name = pickText(
+    product.product_name_el,
+    product.product_name,
+    product.generic_name_el,
+    product.generic_name,
+    product.abbreviated_product_name,
+  );
+
+  return {
+    code,
+    found: Boolean(name),
+    product: name
+      ? {
+          brand: pickText(product.brands),
+          categories: pickText(product.categories),
+          code,
+          name,
+          quantity: pickText(product.quantity),
+          source: "openfoodfacts",
+        }
+      : undefined,
+  };
+}
+
+// Product recognition is best-effort: if the public catalogue misses, the user can still type the name.
+async function fetchProductByCode(rawCode) {
+  const code = extractScannableCode(rawCode);
+
+  if (!code) {
+    return { code: "", found: false };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), PRODUCT_LOOKUP_TIMEOUT_MS);
+  const fields = [
+    "abbreviated_product_name",
+    "brands",
+    "categories",
+    "generic_name",
+    "generic_name_el",
+    "product_name",
+    "product_name_el",
+    "quantity",
+  ].join(",");
+
+  try {
+    const response = await fetch(
+      `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=${fields}`,
+      {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "supermarket-list-app/0.1",
+        },
+        signal: controller.signal,
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error("Product lookup failed");
+    }
+
+    const payload = await response.json();
+
+    if (payload.status !== 1 || !payload.product) {
+      return { code, found: false };
+    }
+
+    return buildProductPayload(code, payload.product);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// Manual body parsing keeps this server dependency-free and enough for the small state payload.
 function readRequestBody(request) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -143,6 +237,16 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    // Stage 1 scanner lookup: barcode/QR code -> product metadata, without mutating the shopping list.
+    const productLookupMatch = url.pathname.match(/^\/api\/products\/(.+)$/);
+
+    if (request.method === "GET" && productLookupMatch) {
+      const code = decodeURIComponent(productLookupMatch[1]);
+      const payload = await fetchProductByCode(code);
+
+      sendJson(response, payload.found ? 200 : 404, payload);
+      return;
+    }
     if (request.method === "GET" && url.pathname === "/api/state") {
       const payload = await readState();
 
@@ -155,6 +259,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    // Persist the whole client state; this keeps categories and item status in one simple document.
     if (request.method === "PUT" && url.pathname === "/api/state") {
       const body = await readRequestBody(request);
       const payload = JSON.parse(body || "{}");

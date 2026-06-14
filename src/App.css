@@ -1,3 +1,4 @@
+/* Design tokens: keep the Stitch-inspired palette and spacing centralized. */
 :root {
   --background: #fcf9f8;
   --surface: #ffffff;
@@ -44,6 +45,7 @@ button {
   cursor: pointer;
 }
 
+/* Page shell and dashboard header. */
 .app-shell {
   min-height: 100vh;
   padding: 16px;
@@ -119,6 +121,7 @@ h1 {
   line-height: 1;
 }
 
+/* Main layout: sticky controls on the left, category grid on the right. */
 .workspace {
   align-items: start;
   display: grid;
@@ -139,23 +142,7 @@ h1 {
   top: 16px;
 }
 
-.panel-heading {
-  align-items: center;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 12px;
-}
-
-.panel-heading div {
-  display: grid;
-  gap: 2px;
-}
-
-.panel-heading span,
-.section-label,
-.category-card header small {
+.section-label {
   color: var(--text-muted);
   font-size: 0.68rem;
   font-weight: 800;
@@ -163,26 +150,11 @@ h1 {
   text-transform: uppercase;
 }
 
-.panel-heading strong {
-  color: var(--primary-strong);
-  font-size: 0.9rem;
-}
-
-.panel-heading em {
-  background: var(--primary-soft);
-  border: 1px solid #d7e8d1;
-  border-radius: 4px;
-  color: var(--primary-strong);
-  font-size: 0.72rem;
-  font-style: normal;
-  font-weight: 750;
-  line-height: 1.2;
-  padding: 4px 6px;
-  text-align: right;
-}
-
+/* Sidebar forms: manual add, scanner, search, and filters. */
 .add-form,
-.filter-block {
+.filter-block,
+/* Scanner card: stage 1 reads the code, stage 2 confirms product/category. */
+.scanner-panel {
   display: grid;
   gap: 8px;
 }
@@ -216,6 +188,86 @@ select:focus {
   display: grid;
   gap: 6px;
   grid-template-columns: 1fr auto;
+}
+
+/* Scanner card: stage 1 reads the code, stage 2 confirms product/category. */
+.scanner-panel {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.scanner-button,
+.scanner-manual {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: 1fr auto;
+}
+
+.scanner-button {
+  align-items: center;
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--primary-strong);
+  display: inline-flex;
+  justify-content: flex-start;
+}
+
+.scanner-button:hover {
+  background: var(--primary-soft);
+}
+
+.scanner-camera {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+
+.scanner-camera video {
+  background: #111111;
+  border-radius: 4px;
+  min-height: 180px;
+  object-fit: cover;
+  width: 100%;
+}
+
+.scanner-camera p,
+.scanner-status {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.scanner-status.found {
+  color: var(--primary-strong);
+}
+
+.scanner-status.error {
+  color: var(--danger);
+}
+
+.scanner-stage {
+  background: var(--accent-soft);
+  border: 1px solid #f4d28e;
+  border-radius: 4px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.scanner-stage small {
+  color: #6e5100;
+  font-size: 0.72rem;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 button {
@@ -298,6 +350,7 @@ button:focus-visible {
   width: 16px;
 }
 
+/* Category cards and product rows. */
 .list-area {
   display: grid;
   gap: 12px;
@@ -511,6 +564,7 @@ button:focus-visible {
   background: var(--danger-soft);
 }
 
+/* Deletion confirmation modal. */
 .modal-backdrop {
   align-items: center;
   background: rgba(28, 27, 27, 0.42);
@@ -602,8 +656,10 @@ button:focus-visible {
   margin: 0;
 }
 
+/* Responsive behavior for tablet and mobile use in the supermarket. */
 @media (max-width: 920px) {
-  .app-shell {
+  /* Page shell and dashboard header. */
+.app-shell {
     padding: 14px;
   }
 
@@ -613,11 +669,13 @@ button:focus-visible {
   }
 
   .stats,
-  .workspace {
+  /* Main layout: sticky controls on the left, category grid on the right. */
+.workspace {
     min-width: 0;
   }
 
-  .workspace {
+  /* Main layout: sticky controls on the left, category grid on the right. */
+.workspace {
     grid-template-columns: 1fr;
   }
 
@@ -627,7 +685,8 @@ button:focus-visible {
 }
 
 @media (max-width: 620px) {
-  .app-shell {
+  /* Page shell and dashboard header. */
+.app-shell {
     padding: 12px;
   }
 
@@ -649,7 +708,8 @@ button:focus-visible {
     grid-template-columns: 1fr;
   }
 
-  .list-area {
+  /* Category cards and product rows. */
+.list-area {
     grid-template-columns: 1fr;
   }
 

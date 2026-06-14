@@ -1,3 +1,4 @@
+// Storage priority: backend JSON DB first, then IndexedDB, then localStorage as the last fallback.
 const DB_NAME = "supermarket-list-db";
 const DB_VERSION = 1;
 const STORE_NAME = "app-state";
@@ -5,6 +6,7 @@ const STATE_KEY = "current";
 const LEGACY_STORAGE_KEY = "supermarket-list-state-v1";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
+// Backend state is the source of truth when the app is used from multiple devices/browsers.
 async function readFromBackend() {
   const response = await fetch(`${API_BASE_URL}/api/state`, {
     headers: { Accept: "application/json" },
@@ -22,6 +24,7 @@ async function readFromBackend() {
   return payload.state;
 }
 
+// Every list change is sent as a full state document to keep the API simple.
 async function writeToBackend(state) {
   const response = await fetch(`${API_BASE_URL}/api/state`, {
     body: JSON.stringify({ state }),
@@ -38,6 +41,7 @@ function canUseIndexedDb() {
   return typeof indexedDB !== "undefined";
 }
 
+// IndexedDB gives us a durable browser cache when the backend is temporarily unavailable.
 function openDatabase() {
   return new Promise((resolve, reject) => {
     if (!canUseIndexedDb()) {
@@ -100,6 +104,7 @@ function writeToIndexedDb(state) {
   });
 }
 
+// localStorage is kept for old saved data and as a tiny emergency fallback.
 function readFromLocalStorage() {
   try {
     const stored = localStorage.getItem(LEGACY_STORAGE_KEY);
@@ -113,6 +118,7 @@ function writeToLocalStorage(state) {
   localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(state));
 }
 
+// Load order also migrates older local data up to the backend whenever possible.
 export async function loadStoredState() {
   try {
     const backendState = await readFromBackend();
@@ -158,6 +164,7 @@ export async function loadStoredState() {
   return { source: "empty", state: undefined };
 }
 
+// Save order mirrors load order: backend first, browser caches second.
 export async function saveStoredState(state) {
   try {
     await writeToBackend(state);
@@ -174,4 +181,21 @@ export async function saveStoredState(state) {
       return "localstorage";
     }
   }
+}
+
+// Scanner lookup is read-only: it identifies a product, then App.jsx decides whether to add it.
+export async function lookupProductCode(code) {
+  const response = await fetch(`${API_BASE_URL}/api/products/${encodeURIComponent(code)}`, {
+    headers: { Accept: "application/json" },
+  });
+
+  if (response.status === 404) {
+    return response.json();
+  }
+
+  if (!response.ok) {
+    throw new Error("Could not look up product code");
+  }
+
+  return response.json();
 }
