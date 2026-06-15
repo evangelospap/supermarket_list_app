@@ -146,6 +146,37 @@ const STARTER_ITEMS = [
 }));
 
 const SCANNER_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "qr_code", "code_128"];
+const CART_SESSION_KEY = "supermarket-cart-session-ids";
+
+function getRouteFromHash() {
+  return window.location.hash === "#/cart" ? "cart" : "dashboard";
+}
+
+function readCartSessionIds() {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(CART_SESSION_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCartSessionIds(itemIds) {
+  try {
+    sessionStorage.setItem(CART_SESSION_KEY, JSON.stringify(itemIds));
+  } catch {
+    // The cart still works for the current render even if sessionStorage is blocked.
+  }
+}
+
+function navigateToHash(hash) {
+  if (window.location.hash === hash) {
+    window.dispatchEvent(new Event("hashchange"));
+    return;
+  }
+
+  window.location.hash = hash;
+}
 
 // Product QR codes sometimes contain URLs; barcodes are usually the 8-14 digit part.
 function normalizeScannedCode(value) {
@@ -202,34 +233,72 @@ function getCategoryIcon(category) {
   return CATEGORY_ICONS[category] ?? "🛒";
 }
 
-// Header only receives computed totals, so it stays display-only.
-function DashboardHeader({ totals }) {
+// Header keeps the title separate from the sticky shopping summary controls.
+function DashboardHeader({ onOpenCart, onViewChange, totals, view }) {
   return (
-    <section className="hero">
-      <div className="title-block">
-        <p className="eyebrow">Supermarket GUI</p>
-        <h1>Λίστα supermarket που ξεχωρίζει τι έχεις και τι χρειάζεσαι.</h1>
-        <p className="dashboard-note">Dashboard αγορών με έξυπνες κατηγορίες και καθαρή εικόνα αποθέματος.</p>
-      </div>
-      <div className="stats" aria-label="Σύνοψη λίστας">
-        <span className="stat-card">
-          <small>Χρειάζομαι</small>
-          <strong>{totals.needed}</strong>
-        </span>
-        <span className="stat-card">
-          <small>Δεν το χρειάζομαι</small>
-          <strong>{totals.notNeeded}</strong>
-        </span>
-        <span className="stat-card">
-          <small>Έχω σπίτι</small>
-          <strong>{totals.have}</strong>
-        </span>
-        <span className="stat-card">
-          <small>Σύνολο</small>
-          <strong>{totals.all}</strong>
-        </span>
-      </div>
-    </section>
+    <>
+      <section className="hero">
+        <div className="title-block">
+          <p className="eyebrow">Supermarket GUI</p>
+          <h2>Λίστα supermarket που ξεχωρίζει τι έχεις και τι χρειάζεσαι.</h2>
+          <p className="dashboard-note">Dashboard αγορών με έξυπνες κατηγορίες και καθαρή εικόνα αποθέματος.</p>
+        </div>
+      </section>
+
+      <section className="summary-bar" aria-label="Σύνοψη και γρήγορα φίλτρα">
+        <div className="stats">
+          <button
+            aria-pressed={view === "needed"}
+            className={`stat-card ${view === "needed" ? "active" : ""}`}
+            type="button"
+            onClick={() => onViewChange("needed")}
+          >
+            <small>Χρειάζομαι</small>
+            <strong>{totals.needed}</strong>
+          </button>
+          <button
+            aria-pressed={view === "notNeeded"}
+            className={`stat-card ${view === "notNeeded" ? "active" : ""}`}
+            type="button"
+            onClick={() => onViewChange("notNeeded")}
+          >
+            <small>Δεν το χρειάζομαι</small>
+            <strong>{totals.notNeeded}</strong>
+          </button>
+          <button
+            aria-pressed={view === "have"}
+            className={`stat-card ${view === "have" ? "active" : ""}`}
+            type="button"
+            onClick={() => onViewChange("have")}
+          >
+            <small>Έχω σπίτι</small>
+            <strong>{totals.have}</strong>
+          </button>
+          <button
+            aria-pressed={view === "all"}
+            className={`stat-card total-card ${view === "all" ? "active" : ""}`}
+            type="button"
+            onClick={() => onViewChange("all")}
+          >
+            <small>Σύνολο</small>
+            <strong>{totals.all}</strong>
+          </button>
+          <button className="shopping-nav-button" type="button" onClick={onOpenCart} aria-label="Πάμε σούπερ!">
+            <span className="shopping-basket-icon" aria-hidden="true">
+              <svg viewBox="0 0 32 32" focusable="false">
+                <path d="M10 13 15 6" />
+                <path d="m22 13-5-7" />
+                <path d="M6 13h20l-2 13H8L6 13Z" />
+                <path d="M11 17v5" />
+                <path d="M16 17v5" />
+                <path d="M21 17v5" />
+              </svg>
+            </span>
+            <span className="shopping-nav-label">Πάμε σούπερ!</span>
+          </button>
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -757,32 +826,91 @@ function ShoppingList({
   );
 }
 
-// Confirmation modal prevents accidental item deletion from a category.
-function DeleteConfirmModal({ item, onCancel, onConfirm }) {
-  if (!item) {
+function ShoppingCartPage({ items, onBack, onToggleTaken }) {
+  const takenCount = items.filter((item) => item.status === "have").length;
+  const remainingCount = items.length - takenCount;
+
+  return (
+    <main className="cart-shell">
+      <section className="cart-hero">
+        <div>
+          <p className="eyebrow">Το καλάθι μου</p>
+          <h1>Checklist για το supermarket.</h1>
+          <p className="dashboard-note">Τσέκαρε κάθε προϊόν όταν το βάλεις στο καλάθι. Οι επιλογές σώζονται στη λίστα σου.</p>
+        </div>
+        <button className="cart-back-button" type="button" onClick={onBack}>
+          Πάμε πίσω
+        </button>
+      </section>
+
+      <section className="cart-summary" aria-label="Σύνοψη καλαθιού">
+        <span>
+          <small>Μένουν</small>
+          <strong>{remainingCount}</strong>
+        </span>
+        <span>
+          <small>Τα πήρα</small>
+          <strong>{takenCount}</strong>
+        </span>
+        <span>
+          <small>Σύνολο διαδρομής</small>
+          <strong>{items.length}</strong>
+        </span>
+      </section>
+
+      <section className="cart-list" aria-label="Checklist προϊόντων">
+        {items.length === 0 ? (
+          <div className="cart-empty">
+            <h2>Δεν έχεις προϊόντα για αγορά.</h2>
+            <p>Πήγαινε πίσω και βάλε προϊόντα στο Χρειάζομαι για να φτιαχτεί το καλάθι.</p>
+          </div>
+        ) : (
+          items.map((item) => (
+            <label className={`cart-item ${item.status === "have" ? "taken" : ""}`} key={item.id}>
+              <input
+                checked={item.status === "have"}
+                onChange={() => onToggleTaken(item.id)}
+                type="checkbox"
+              />
+              <span className="cart-item-main">
+                <span className="cart-item-name">{item.name}</span>
+                <span className="cart-item-category">
+                  {getCategoryIcon(item.category)} {item.category}
+                </span>
+              </span>
+              <span className="cart-item-status">{item.status === "have" ? "Το πήρα!" : "Εκκρεμεί"}</span>
+            </label>
+          ))
+        )}
+      </section>
+    </main>
+  );
+}
+
+// Confirmation modal prevents accidental destructive actions.
+function ConfirmModal({ action, onCancel, onConfirm }) {
+  if (!action) {
     return null;
   }
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={onCancel}>
       <div
-        aria-labelledby="delete-modal-title"
+        aria-labelledby="confirm-modal-title"
         aria-modal="true"
         className="confirm-modal"
         role="dialog"
         onClick={(event) => event.stopPropagation()}
       >
-        <p className="modal-eyebrow">Επιβεβαίωση διαγραφής</p>
-        <h2 id="delete-modal-title">Να διαγραφεί αυτό το προϊόν;</h2>
-        <p>
-          Θέλεις όντως να διαγράψεις το <strong>{item.name}</strong> από την κατηγορία <strong>{item.category}</strong>;
-        </p>
+        <p className="modal-eyebrow">{action.eyebrow}</p>
+        <h2 id="confirm-modal-title">{action.title}</h2>
+        <p>{action.message}</p>
         <div className="modal-actions">
           <button type="button" className="modal-secondary" onClick={onCancel}>
             Άκυρο
           </button>
           <button type="button" className="modal-danger" onClick={onConfirm}>
-            Διαγραφή
+            {action.confirmLabel}
           </button>
         </div>
       </div>
@@ -801,8 +929,30 @@ function App() {
   const [quickAddName, setQuickAddName] = useState("");
   const [query, setQuery] = useState("");
   const [view, setView] = useState("all");
+  const [page, setPage] = useState(getRouteFromHash);
+  const [cartItemIds, setCartItemIds] = useState(readCartSessionIds);
   const [pendingDeleteItem, setPendingDeleteItem] = useState(null);
+  const [pendingClearCompleted, setPendingClearCompleted] = useState(false);
   const didFinishInitialLoad = useRef(false);
+
+  useEffect(() => {
+    function syncRouteFromHash() {
+      const nextPage = getRouteFromHash();
+
+      setPage(nextPage);
+
+      if (window.location.hash === "#/needed") {
+        setView("needed");
+      }
+    }
+
+    syncRouteFromHash();
+    window.addEventListener("hashchange", syncRouteFromHash);
+
+    return () => {
+      window.removeEventListener("hashchange", syncRouteFromHash);
+    };
+  }, []);
 
   // Load server/browser persisted state once, then let React own the live edits.
   useEffect(() => {
@@ -847,6 +997,19 @@ function App() {
     });
   }, [state, storageReady]);
 
+  useEffect(() => {
+    if (page !== "cart" || cartItemIds.length > 0) {
+      return;
+    }
+
+    const neededItemIds = state.items.filter((item) => item.status === "needed").map((item) => item.id);
+
+    if (neededItemIds.length > 0) {
+      setCartItemIds(neededItemIds);
+      writeCartSessionIds(neededItemIds);
+    }
+  }, [cartItemIds.length, page, state.items]);
+
   // Derived values keep render code small and avoid repeated filtering work.
   const guessedCategory = useMemo(() => {
     return draftName ? suggestCategory(draftName) : "Να μην ξεχάσω";
@@ -886,6 +1049,17 @@ function App() {
       { all: 0, needed: 0, notNeeded: 0, have: 0 },
     );
   }, [state.items]);
+
+  const cartItems = useMemo(() => {
+    const cartIdSet = new Set(cartItemIds);
+
+    return state.items
+      .filter((item) => cartIdSet.has(item.id) && item.status !== "notNeeded")
+      .sort((a, b) => {
+        const categorySort = state.categories.indexOf(a.category) - state.categories.indexOf(b.category);
+        return categorySort || a.name.localeCompare(b.name, "el");
+      });
+  }, [cartItemIds, state.categories, state.items]);
 
   // Global add respects manual category, smart category, or a brand-new custom category.
   function addItem(event) {
@@ -995,6 +1169,17 @@ function App() {
     }));
   }
 
+  function openShoppingCart() {
+    const neededItemIds = state.items.filter((item) => item.status === "needed").map((item) => item.id);
+    setCartItemIds(neededItemIds);
+    writeCartSessionIds(neededItemIds);
+    navigateToHash("#/cart");
+  }
+
+  function closeShoppingCart() {
+    navigateToHash("#/needed");
+  }
+
   function toggleNotNeededStatus(itemId) {
     setState((current) => ({
       ...current,
@@ -1037,12 +1222,41 @@ function App() {
     setView("all");
     setQuickAddCategory("");
     setQuickAddName("");
+    setCartItemIds([]);
+    writeCartSessionIds([]);
+    navigateToHash("#/");
     setPendingDeleteItem(null);
+    setPendingClearCompleted(false);
+  }
+
+  const pendingConfirmAction = pendingDeleteItem
+    ? {
+        confirmLabel: "Διαγραφή",
+        eyebrow: "Επιβεβαίωση διαγραφής",
+        message: (
+          <>
+            Θέλεις όντως να διαγράψεις το <strong>{pendingDeleteItem.name}</strong> από την κατηγορία{" "}
+            <strong>{pendingDeleteItem.category}</strong>;
+          </>
+        ),
+        title: "Να διαγραφεί αυτό το προϊόν;",
+      }
+    : pendingClearCompleted
+      ? {
+          confirmLabel: "Καθάρισε",
+          eyebrow: "Επιβεβαίωση καθαρισμού",
+          message: `Θέλεις όντως να αφαιρεθούν ${totals.have} προϊόντα που έχεις ήδη σπίτι;`,
+          title: "Να καθαριστούν όσα έχω;",
+        }
+      : null;
+
+  if (page === "cart") {
+    return <ShoppingCartPage items={cartItems} onBack={closeShoppingCart} onToggleTaken={toggleItemStatus} />;
   }
 
   return (
     <main className="app-shell">
-      <DashboardHeader totals={totals} />
+      <DashboardHeader totals={totals} view={view} onOpenCart={openShoppingCart} onViewChange={setView} />
 
       <section className="workspace">
         <ControlsPanel
@@ -1055,7 +1269,7 @@ function App() {
           view={view}
           onAddItem={addItem}
           onAddScannedItem={addScannedItem}
-          onClearCompleted={clearCompleted}
+          onClearCompleted={() => setPendingClearCompleted(true)}
           onDraftCategoryChange={setDraftCategory}
           onDraftNameChange={setDraftName}
           onNewCategoryChange={setNewCategory}
@@ -1079,10 +1293,23 @@ function App() {
         />
       </section>
 
-      <DeleteConfirmModal
-        item={pendingDeleteItem}
-        onCancel={() => setPendingDeleteItem(null)}
-        onConfirm={confirmRemoveItem}
+      <ConfirmModal
+        action={pendingConfirmAction}
+        onCancel={() => {
+          setPendingDeleteItem(null);
+          setPendingClearCompleted(false);
+        }}
+        onConfirm={() => {
+          if (pendingDeleteItem) {
+            confirmRemoveItem();
+            return;
+          }
+
+          if (pendingClearCompleted) {
+            clearCompleted();
+            setPendingClearCompleted(false);
+          }
+        }}
       />
     </main>
   );
