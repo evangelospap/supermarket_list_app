@@ -20,7 +20,9 @@ export function ControlsPanel({
   onNewCategoryChange,
   onQueryChange,
   onResetList,
+  onTogglePriceFields,
   onViewChange,
+  showPriceFields,
 }) {
   return (
     <aside className="controls-panel" aria-label="Προσθήκη και φίλτρα">
@@ -47,9 +49,18 @@ export function ControlsPanel({
           <span className="button-icon" aria-hidden="true">⊠</span>
           <span>Καθάρισε όσα έχω</span>
         </button>
+        <button
+          aria-pressed={showPriceFields}
+          className={`secondary-action price-toggle ${showPriceFields ? "active" : ""}`}
+          type="button"
+          onClick={onTogglePriceFields}
+        >
+          <span className="button-icon" aria-hidden="true">€</span>
+          <span>Τιμές</span>
+        </button>
         <button className="secondary-action" type="button" onClick={onResetList}>
           <span className="button-icon" aria-hidden="true">↻</span>
-          <span>Reset σε προεπιλεγμένη λίστα</span>
+          <span>Reset Έχω σπίτι</span>
         </button>
       </div>
 

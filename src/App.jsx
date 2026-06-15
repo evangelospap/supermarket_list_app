@@ -12,6 +12,24 @@ import { normalizeScannedCode } from "./utils/scanner";
 import { buildInitialState, isValidState, normalizeState } from "./utils/state";
 import { getQuantityNote, normalizeQuantityCount } from "./utils/quantity";
 
+const PRICE_FIELDS_STORAGE_KEY = "supermarket-show-price-fields";
+
+function readStoredPriceFieldsVisibility() {
+  try {
+    return globalThis.localStorage?.getItem(PRICE_FIELDS_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeStoredPriceFieldsVisibility(isVisible) {
+  try {
+    globalThis.localStorage?.setItem(PRICE_FIELDS_STORAGE_KEY, String(isVisible));
+  } catch {
+    // Local UI preference only; ignore unavailable storage.
+  }
+}
+
 function createShoppingItem({ barcode, category, estimatedPrice = "", name, quantityCount = 1, quantityNote = "" }) {
   return {
     barcode,
@@ -130,6 +148,7 @@ function App() {
   const [pendingResetList, setPendingResetList] = useState(false);
   const [pendingDuplicate, setPendingDuplicate] = useState(null);
   const [pendingVoiceItems, setPendingVoiceItems] = useState([]);
+  const [showPriceFields, setShowPriceFields] = useState(readStoredPriceFieldsVisibility);
   const didFinishInitialLoad = useRef(false);
 
   useEffect(() => {
@@ -472,6 +491,14 @@ function App() {
     }));
   }
 
+  function togglePriceFields() {
+    setShowPriceFields((current) => {
+      const next = !current;
+      writeStoredPriceFieldsVisibility(next);
+      return next;
+    });
+  }
+
   function openShoppingCart() {
     const neededItemIds = state.items.filter((item) => item.status === "needed").map((item) => item.id);
     setCartItemIds(neededItemIds);
@@ -506,15 +533,14 @@ function App() {
     }));
   }
 
-  function resetList() {
-    setState(buildInitialState());
+  function resetHaveItems() {
+    setState((current) => ({
+      ...current,
+      items: current.items.map((item) => (item.status === "have" ? { ...item, status: "needed" } : item)),
+    }));
     setQuery("");
-    setView("all");
-    setQuickAddCategory("");
-    setQuickAddName("");
-    setCartItemIds([]);
-    writeCartSessionIds([]);
-    navigateToHash("#/");
+    setView("needed");
+    navigateToHash("#/needed");
     setPendingDeleteItem(null);
     setPendingClearCompleted(false);
     setPendingResetList(false);
@@ -522,7 +548,18 @@ function App() {
     setPendingVoiceItems([]);
   }
 
-  const pendingConfirmAction = pendingDuplicate
+  const resetHaveItemsConfirmAction = {
+    cancelLabel: "Άκυρο",
+    confirmLabel: "Reset Έχω σπίτι",
+    eyebrow: "Επιβεβαίωση reset",
+    message:
+      "Θέλεις να επιστρέψουν όλα τα προϊόντα από Έχω σπίτι πίσω στο Χρειάζομαι; Δεν θα διαγραφούν προϊόντα, ποσότητες, τιμές ή barcode.",
+    title: "Reset για όσα έχω σπίτι;",
+  };
+
+  const pendingConfirmAction = pendingResetList
+    ? resetHaveItemsConfirmAction
+    : pendingDuplicate
     ? {
         confirmClassName: "modal-primary",
         confirmLabel: "Αύξηση ποσότητας",
@@ -556,13 +593,6 @@ function App() {
           message: `Θέλεις όντως να αφαιρεθούν ${totals.have} προϊόντα που έχεις ήδη σπίτι;`,
           title: "Να καθαριστούν όσα έχω;",
         }
-      : pendingResetList
-        ? {
-            confirmLabel: "Reset",
-            eyebrow: "Επιβεβαίωση reset",
-            message: "Θέλεις όντως να σβηστεί η τωρινή λίστα και να επανέλθει η demo λίστα;",
-            title: "Να γίνει reset της λίστας;",
-          }
       : null;
 
   if (page === "cart") {
@@ -571,8 +601,10 @@ function App() {
         items={cartItems}
         onBack={closeShoppingCart}
         onFinishShopping={finishShopping}
+        onTogglePriceFields={togglePriceFields}
         onToggleTaken={toggleItemStatus}
         onUpdateItemEstimatedPrice={updateItemEstimatedPrice}
+        showPriceFields={showPriceFields}
       />
     );
   }
@@ -599,7 +631,9 @@ function App() {
           onNewCategoryChange={setNewCategory}
           onQueryChange={setQuery}
           onResetList={() => setPendingResetList(true)}
+          onTogglePriceFields={togglePriceFields}
           onViewChange={setView}
+          showPriceFields={showPriceFields}
         />
 
         <ShoppingList
@@ -616,6 +650,7 @@ function App() {
           onUpdateItemEstimatedPrice={updateItemEstimatedPrice}
           onUpdateItemQuantityCount={updateItemQuantityCount}
           onUpdateItemQuantityNote={updateItemQuantityNote}
+          showPriceFields={showPriceFields}
         />
       </section>
 
@@ -645,7 +680,7 @@ function App() {
           }
 
           if (pendingResetList) {
-            resetList();
+            resetHaveItems();
           }
         }}
         onSecondary={() => {

@@ -100,6 +100,7 @@ function ItemRow({
   onUpdateItemEstimatedPrice,
   onUpdateItemQuantityCount,
   onUpdateItemQuantityNote,
+  showPriceFields,
 }) {
   return (
     <div className={`item-row ${item.status}`}>
@@ -129,13 +130,13 @@ function ItemRow({
         </span>
       </div>
 
-      <div className="item-detail-fields">
+      <div className={`item-detail-fields ${showPriceFields ? "with-prices" : "without-prices"}`}>
         <QuantityEditor
           item={item}
           onUpdateItemQuantityCount={onUpdateItemQuantityCount}
           onUpdateItemQuantityNote={onUpdateItemQuantityNote}
         />
-        <PriceEditor item={item} onUpdateItemEstimatedPrice={onUpdateItemEstimatedPrice} />
+        {showPriceFields ? <PriceEditor item={item} onUpdateItemEstimatedPrice={onUpdateItemEstimatedPrice} /> : null}
       </div>
 
       <button
@@ -163,6 +164,7 @@ function CategoryCard({
   onUpdateItemEstimatedPrice,
   onUpdateItemQuantityCount,
   onUpdateItemQuantityNote,
+  showPriceFields,
 }) {
   return (
     <article className="category-card">
@@ -212,6 +214,7 @@ function CategoryCard({
             onUpdateItemEstimatedPrice={onUpdateItemEstimatedPrice}
             onUpdateItemQuantityCount={onUpdateItemQuantityCount}
             onUpdateItemQuantityNote={onUpdateItemQuantityNote}
+            showPriceFields={showPriceFields}
           />
         ))}
       </div>
@@ -232,6 +235,7 @@ export function ShoppingList({
   onUpdateItemEstimatedPrice,
   onUpdateItemQuantityCount,
   onUpdateItemQuantityNote,
+  showPriceFields,
 }) {
   if (itemsByCategory.length === 0) {
     return (
@@ -261,6 +265,7 @@ export function ShoppingList({
           onUpdateItemEstimatedPrice={onUpdateItemEstimatedPrice}
           onUpdateItemQuantityCount={onUpdateItemQuantityCount}
           onUpdateItemQuantityNote={onUpdateItemQuantityNote}
+          showPriceFields={showPriceFields}
         />
       ))}
     </section>
