@@ -31,16 +31,16 @@ function App() {
     function syncRouteFromHash() {
       setPage(getRouteFromHash());
 
-      if (window.location.hash === "#/needed") {
+      if (globalThis.location.hash === "#/needed") {
         setView("needed");
       }
     }
 
     syncRouteFromHash();
-    window.addEventListener("hashchange", syncRouteFromHash);
+    globalThis.addEventListener("hashchange", syncRouteFromHash);
 
     return () => {
-      window.removeEventListener("hashchange", syncRouteFromHash);
+      globalThis.removeEventListener("hashchange", syncRouteFromHash);
     };
   }, []);
 
