@@ -4,15 +4,23 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 const certDir = path.resolve("certs");
-const certFile = path.join(certDir, "local-dev.pem");
-const keyFile = path.join(certDir, "local-dev-key.pem");
-const httpsConfig =
-  existsSync(certFile) && existsSync(keyFile)
-    ? {
-        cert: readFileSync(certFile),
-        key: readFileSync(keyFile),
-      }
-    : undefined;
+const certificatePairs = [
+  {
+    certFile: path.join(certDir, "tailscale-dev.pem"),
+    keyFile: path.join(certDir, "tailscale-dev-key.pem"),
+  },
+  {
+    certFile: path.join(certDir, "local-dev.pem"),
+    keyFile: path.join(certDir, "local-dev-key.pem"),
+  },
+];
+
+const httpsConfig = certificatePairs
+  .filter(({ certFile, keyFile }) => existsSync(certFile) && existsSync(keyFile))
+  .map(({ certFile, keyFile }) => ({
+    cert: readFileSync(certFile),
+    key: readFileSync(keyFile),
+  }))[0];
 
 export default defineConfig({
   plugins: [react()],
