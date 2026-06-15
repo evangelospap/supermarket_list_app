@@ -24,6 +24,26 @@ const MIME_TYPES = {
   ".svg": "image/svg+xml",
 };
 
+function isPlainObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeQuantityCount(value) {
+  return Number.isFinite(value) && value >= 1 ? Math.floor(value) : 1;
+}
+
+function getQuantityNote(item) {
+  if (typeof item?.quantityNote === "string") {
+    return item.quantityNote;
+  }
+
+  return typeof item?.quantity === "string" ? item.quantity : "";
+}
+
+function normalizeEstimatedPrice(value) {
+  return typeof value === "string" ? value : "";
+}
+
 // All API responses share permissive CORS because the Vite dev server and backend run on different ports.
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
@@ -73,27 +93,77 @@ async function sendStaticFile(response, pathname) {
 }
 
 // Keep state validation small but strict enough to avoid writing broken list data to disk.
+function isValidLearnedProducts(value) {
+  return (
+    value === undefined ||
+    (isPlainObject(value) &&
+      Object.entries(value).every(([code, product]) => {
+        const normalizedCode = extractScannableCode(code);
+
+        return (
+          typeof code === "string" &&
+          code.trim() &&
+          code.length <= 256 &&
+          normalizedCode === code &&
+          isPlainObject(product) &&
+          (product.code === undefined || product.code === code) &&
+          typeof product.name === "string" &&
+          product.name.trim() &&
+          product.name.length <= 200 &&
+          typeof product.category === "string" &&
+          product.category.trim() &&
+          product.category.length <= 120 &&
+          (product.updatedAt === undefined || typeof product.updatedAt === "string")
+        );
+      }))
+  );
+}
+
 function isValidState(value) {
   return (
     value &&
     Array.isArray(value.categories) &&
     Array.isArray(value.items) &&
+    isValidLearnedProducts(value.learnedProducts) &&
     value.items.every(
       (item) =>
         typeof item.id === "string" &&
         typeof item.name === "string" &&
         typeof item.category === "string" &&
         (item.status === "needed" || item.status === "notNeeded" || item.status === "have") &&
+        (item.quantityCount === undefined ||
+          (Number.isFinite(item.quantityCount) && item.quantityCount >= 1)) &&
+        (item.estimatedPrice === undefined || typeof item.estimatedPrice === "string") &&
+        (item.quantityNote === undefined || typeof item.quantityNote === "string") &&
         (item.quantity === undefined || typeof item.quantity === "string"),
     )
   );
+}
+
+function normalizeItem(item) {
+  const { quantity, ...rest } = item;
+
+  return {
+    ...rest,
+    estimatedPrice: normalizeEstimatedPrice(item.estimatedPrice),
+    quantityCount: normalizeQuantityCount(item.quantityCount),
+    quantityNote: getQuantityNote(item),
+  };
+}
+
+function normalizeState(state) {
+  return {
+    ...state,
+    items: Array.isArray(state?.items) ? state.items.map(normalizeItem) : [],
+    learnedProducts: state?.learnedProducts ?? {},
+  };
 }
 
 async function readState() {
   try {
     const contents = await readFile(STATE_FILE, "utf8");
     const payload = JSON.parse(contents);
-    return isValidState(payload.state) ? payload : undefined;
+    return isValidState(payload.state) ? { ...payload, state: normalizeState(payload.state) } : undefined;
   } catch (error) {
     if (error.code === "ENOENT") {
       return undefined;
@@ -106,7 +176,7 @@ async function readState() {
 // Write through a temporary file, then rename, so a crash is less likely to corrupt the JSON DB.
 async function writeState(state, updatedAt = new Date().toISOString()) {
   const payload = {
-    state,
+    state: normalizeState(state),
     updatedAt,
   };
   const tempFile = `${STATE_FILE}.tmp`;
@@ -154,6 +224,32 @@ function buildProductPayload(code, product) {
         }
       : undefined,
   };
+}
+
+function buildLearnedProductPayload(code, product) {
+  return {
+    code,
+    found: true,
+    product: {
+      category: product.category,
+      code,
+      name: product.name,
+      source: "learned",
+    },
+  };
+}
+
+async function findLearnedProductByCode(rawCode) {
+  const code = extractScannableCode(rawCode);
+
+  if (!code) {
+    return { code: "", found: false };
+  }
+
+  const payload = await readState();
+  const product = payload?.state?.learnedProducts?.[code];
+
+  return product ? buildLearnedProductPayload(code, product) : undefined;
 }
 
 // Product recognition is best-effort: if the public catalogue misses, the user can still type the name.
@@ -243,7 +339,7 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && productLookupMatch) {
       const code = decodeURIComponent(productLookupMatch[1]);
-      const payload = await fetchProductByCode(code);
+      const payload = (await findLearnedProductByCode(code)) ?? (await fetchProductByCode(code));
 
       sendJson(response, payload.found ? 200 : 404, payload);
       return;

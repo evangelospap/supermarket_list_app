@@ -38,7 +38,8 @@ export function ProductScanner({ categories, onAddScannedItem }) {
         const product = result.product ?? null;
         const productName = product?.name ?? "";
         const suggestedCategory = productName ? suggestCategory(productName) : "Να μην ξεχάσω";
-        const safeCategory = categories.includes(suggestedCategory) ? suggestedCategory : "Να μην ξεχάσω";
+        const preferredCategory = product?.category || suggestedCategory;
+        const safeCategory = categories.includes(preferredCategory) ? preferredCategory : "Να μην ξεχάσω";
 
         setLookupProduct(product);
         setStagedName(productName);

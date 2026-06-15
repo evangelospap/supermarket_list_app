@@ -1,6 +1,7 @@
 import { AddItemForm } from "./AddItemForm";
 import { FilterPanel } from "./FilterPanel";
 import { ProductScanner } from "./ProductScanner";
+import { VoiceAddPanel } from "./VoiceAddPanel";
 
 export function ControlsPanel({
   categories,
@@ -12,6 +13,7 @@ export function ControlsPanel({
   view,
   onAddItem,
   onAddScannedItem,
+  onAddVoiceItems,
   onClearCompleted,
   onDraftCategoryChange,
   onDraftNameChange,
@@ -35,6 +37,8 @@ export function ControlsPanel({
         onDraftNameChange={onDraftNameChange}
         onNewCategoryChange={onNewCategoryChange}
       />
+
+      <VoiceAddPanel categories={categories} onAddVoiceItems={onAddVoiceItems} />
 
       <ProductScanner categories={categories} onAddScannedItem={onAddScannedItem} />
 

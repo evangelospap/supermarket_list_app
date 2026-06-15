@@ -1,17 +1,113 @@
+import { useEffect, useState } from "react";
 import { getCategoryIcon } from "../utils/categories";
+import { formatEuroAmount, getEstimatedLineTotal, parseEstimatedPrice } from "../utils/price";
+import { getQuantitySummary, hasCustomQuantity, normalizeQuantityCount } from "../utils/quantity";
+
+function QuantityEditor({ item, onUpdateItemQuantityCount, onUpdateItemQuantityNote }) {
+  const quantityCount = normalizeQuantityCount(item.quantityCount);
+  const [quantityDraft, setQuantityDraft] = useState(String(quantityCount));
+
+  useEffect(() => {
+    setQuantityDraft(String(quantityCount));
+  }, [quantityCount]);
+
+  return (
+    <div className="quantity-field" aria-label={`Ποσότητα για ${item.name}`}>
+      <span>Ποσ.</span>
+      <div className="quantity-controls">
+        <button
+          aria-label={`Μείωση ποσότητας για ${item.name}`}
+          className="quantity-stepper"
+          disabled={quantityCount <= 1}
+          type="button"
+          onClick={() => {
+            const nextCount = Math.max(1, quantityCount - 1);
+            setQuantityDraft(String(nextCount));
+            onUpdateItemQuantityCount(item.id, nextCount);
+          }}
+        >
+          -
+        </button>
+        <input
+          aria-label={`Αριθμός τεμαχίων για ${item.name}`}
+          inputMode="numeric"
+          min="1"
+          pattern="[0-9]*"
+          type="text"
+          value={quantityDraft}
+          onBlur={(event) => {
+            if (!event.target.value.trim()) {
+              setQuantityDraft("1");
+              onUpdateItemQuantityCount(item.id, 1);
+            }
+          }}
+          onChange={(event) => {
+            const nextValue = event.target.value.replace(/\D/g, "");
+            setQuantityDraft(nextValue);
+
+            if (nextValue) {
+              onUpdateItemQuantityCount(item.id, Number(nextValue));
+            }
+          }}
+        />
+        <button
+          aria-label={`Αύξηση ποσότητας για ${item.name}`}
+          className="quantity-stepper"
+          type="button"
+          onClick={() => {
+            const nextCount = quantityCount + 1;
+            setQuantityDraft(String(nextCount));
+            onUpdateItemQuantityCount(item.id, nextCount);
+          }}
+        >
+          +
+        </button>
+        <input
+          aria-label={`Σημείωση ποσότητας για ${item.name}`}
+          className="quantity-note"
+          value={item.quantityNote ?? ""}
+          onChange={(event) => onUpdateItemQuantityNote(item.id, event.target.value)}
+          placeholder="500γρ"
+        />
+      </div>
+    </div>
+  );
+}
+
+function PriceEditor({ item, onUpdateItemEstimatedPrice }) {
+  const hasPrice = parseEstimatedPrice(item.estimatedPrice) > 0;
+
+  return (
+    <label className="price-field">
+      <span>€/τεμ.</span>
+      <input
+        aria-label={`Εκτιμώμενη τιμή για ${item.name}`}
+        inputMode="decimal"
+        placeholder="0.00"
+        value={item.estimatedPrice ?? ""}
+        onChange={(event) => onUpdateItemEstimatedPrice(item.id, event.target.value)}
+      />
+      {hasPrice ? <small>{formatEuroAmount(getEstimatedLineTotal(item))}</small> : null}
+    </label>
+  );
+}
 
 function ItemRow({
   item,
-  view,
   onRequestRemoveItem,
   onToggleItemStatus,
   onToggleNotNeededStatus,
-  onUpdateItemQuantity,
+  onUpdateItemEstimatedPrice,
+  onUpdateItemQuantityCount,
+  onUpdateItemQuantityNote,
 }) {
   return (
     <div className={`item-row ${item.status}`}>
       <div className="item-check">
-        <span className="item-name">{item.name}</span>
+        <span className="item-name">
+          <strong>{item.name}</strong>
+          {hasCustomQuantity(item) ? <span className="quantity-summary">{getQuantitySummary(item)}</span> : null}
+        </span>
         <span className="item-actions">
           <span className="have-toggle">
             <input
@@ -33,17 +129,14 @@ function ItemRow({
         </span>
       </div>
 
-      {item.status === "have" && view === "have" ? (
-        <label className="quantity-field">
-          <span>Ποσότητα</span>
-          <input
-            aria-label={`Ποσότητα για ${item.name}`}
-            value={item.quantity ?? ""}
-            onChange={(event) => onUpdateItemQuantity(item.id, event.target.value)}
-            placeholder="π.χ. 500γρ"
-          />
-        </label>
-      ) : null}
+      <div className="item-detail-fields">
+        <QuantityEditor
+          item={item}
+          onUpdateItemQuantityCount={onUpdateItemQuantityCount}
+          onUpdateItemQuantityNote={onUpdateItemQuantityNote}
+        />
+        <PriceEditor item={item} onUpdateItemEstimatedPrice={onUpdateItemEstimatedPrice} />
+      </div>
 
       <button
         aria-label={`Διαγραφή ${item.name}`}
@@ -59,7 +152,6 @@ function ItemRow({
 
 function CategoryCard({
   group,
-  view,
   quickAddCategory,
   quickAddName,
   onAddItemToCategory,
@@ -68,7 +160,9 @@ function CategoryCard({
   onToggleItemStatus,
   onToggleNotNeededStatus,
   onToggleQuickAdd,
-  onUpdateItemQuantity,
+  onUpdateItemEstimatedPrice,
+  onUpdateItemQuantityCount,
+  onUpdateItemQuantityNote,
 }) {
   return (
     <article className="category-card">
@@ -112,11 +206,12 @@ function CategoryCard({
           <ItemRow
             item={item}
             key={item.id}
-            view={view}
             onRequestRemoveItem={onRequestRemoveItem}
             onToggleItemStatus={onToggleItemStatus}
             onToggleNotNeededStatus={onToggleNotNeededStatus}
-            onUpdateItemQuantity={onUpdateItemQuantity}
+            onUpdateItemEstimatedPrice={onUpdateItemEstimatedPrice}
+            onUpdateItemQuantityCount={onUpdateItemQuantityCount}
+            onUpdateItemQuantityNote={onUpdateItemQuantityNote}
           />
         ))}
       </div>
@@ -126,7 +221,6 @@ function CategoryCard({
 
 export function ShoppingList({
   itemsByCategory,
-  view,
   quickAddCategory,
   quickAddName,
   onAddItemToCategory,
@@ -135,7 +229,9 @@ export function ShoppingList({
   onToggleItemStatus,
   onToggleNotNeededStatus,
   onToggleQuickAdd,
-  onUpdateItemQuantity,
+  onUpdateItemEstimatedPrice,
+  onUpdateItemQuantityCount,
+  onUpdateItemQuantityNote,
 }) {
   if (itemsByCategory.length === 0) {
     return (
@@ -154,7 +250,6 @@ export function ShoppingList({
         <CategoryCard
           group={group}
           key={group.category}
-          view={view}
           quickAddCategory={quickAddCategory}
           quickAddName={quickAddName}
           onAddItemToCategory={onAddItemToCategory}
@@ -163,7 +258,9 @@ export function ShoppingList({
           onToggleItemStatus={onToggleItemStatus}
           onToggleNotNeededStatus={onToggleNotNeededStatus}
           onToggleQuickAdd={onToggleQuickAdd}
-          onUpdateItemQuantity={onUpdateItemQuantity}
+          onUpdateItemEstimatedPrice={onUpdateItemEstimatedPrice}
+          onUpdateItemQuantityCount={onUpdateItemQuantityCount}
+          onUpdateItemQuantityNote={onUpdateItemQuantityNote}
         />
       ))}
     </section>

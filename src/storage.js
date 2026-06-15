@@ -1,4 +1,6 @@
 // Storage priority: backend JSON DB first, then IndexedDB, then localStorage as the last fallback.
+import { normalizeState } from "./utils/state";
+
 const DB_NAME = "supermarket-list-db";
 const DB_VERSION = 1;
 const STORE_NAME = "app-state";
@@ -7,7 +9,7 @@ const LEGACY_STORAGE_KEY = "supermarket-list-state-v1";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 function buildStoredPayload(state, updatedAt = new Date().toISOString()) {
-  return { state, updatedAt };
+  return { state: normalizeState(state), updatedAt };
 }
 
 function normalizeStoredPayload(payload) {

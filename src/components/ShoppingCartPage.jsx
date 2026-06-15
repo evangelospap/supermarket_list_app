@@ -1,9 +1,12 @@
 import { getCategoryIcon } from "../utils/categories";
+import { formatEuroAmount, getEstimatedLineTotal } from "../utils/price";
+import { getQuantitySummary } from "../utils/quantity";
 import { ScrollTopButton } from "./ScrollTopButton";
 
-export function ShoppingCartPage({ items, onBack, onToggleTaken }) {
+export function ShoppingCartPage({ items, onBack, onFinishShopping, onToggleTaken, onUpdateItemEstimatedPrice }) {
   const takenCount = items.filter((item) => item.status === "have").length;
   const remainingCount = items.length - takenCount;
+  const estimatedTotal = items.reduce((total, item) => total + getEstimatedLineTotal(item), 0);
 
   return (
     <main className="cart-shell">
@@ -13,9 +16,14 @@ export function ShoppingCartPage({ items, onBack, onToggleTaken }) {
           <h2>Checklist για το supermarket.</h2>
           <p className="dashboard-note">Τσέκαρε κάθε προϊόν όταν το βάλεις στο καλάθι. Οι επιλογές σώζονται στη λίστα σου.</p>
         </div>
-        <button className="cart-back-button" type="button" onClick={onBack}>
-          Πάμε πίσω
-        </button>
+        <div className="cart-actions">
+          <button className="cart-back-button" type="button" onClick={onBack}>
+            Πάμε πίσω
+          </button>
+          <button className="cart-finish-button" type="button" onClick={onFinishShopping}>
+            Τέλος αγορών
+          </button>
+        </div>
       </section>
 
       <section className="cart-summary" aria-label="Σύνοψη καλαθιού">
@@ -31,6 +39,10 @@ export function ShoppingCartPage({ items, onBack, onToggleTaken }) {
           <small>Σύνολο διαδρομής</small>
           <strong>{items.length}</strong>
         </span>
+        <span>
+          <small>Εκτίμηση</small>
+          <strong>{formatEuroAmount(estimatedTotal)}</strong>
+        </span>
       </section>
 
       <section className="cart-list" aria-label="Checklist προϊόντων">
@@ -41,8 +53,9 @@ export function ShoppingCartPage({ items, onBack, onToggleTaken }) {
           </div>
         ) : (
           items.map((item) => (
-            <label className={`cart-item ${item.status === "have" ? "taken" : ""}`} key={item.id}>
+            <div className={`cart-item ${item.status === "have" ? "taken" : ""}`} key={item.id}>
               <input
+                aria-label={`${item.status === "have" ? "Ξανά στη λίστα" : "Το πήρα"}: ${item.name}`}
                 checked={item.status === "have"}
                 onChange={() => onToggleTaken(item.id)}
                 type="checkbox"
@@ -52,9 +65,21 @@ export function ShoppingCartPage({ items, onBack, onToggleTaken }) {
                 <span className="cart-item-category">
                   {getCategoryIcon(item.category)} {item.category}
                 </span>
+                <span className="cart-item-quantity">{getQuantitySummary(item)}</span>
+                <label className="cart-price-field">
+                  <span>Τιμή / τεμ.</span>
+                  <input
+                    aria-label={`Εκτιμώμενη τιμή για ${item.name}`}
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={item.estimatedPrice ?? ""}
+                    onChange={(event) => onUpdateItemEstimatedPrice(item.id, event.target.value)}
+                  />
+                  {/* <small>{formatEuroAmount(getEstimatedLineTotal(item))} σύνολο</small> */}
+                </label>
               </span>
               <span className="cart-item-status">{item.status === "have" ? "Το πήρα!" : "Εκκρεμεί"}</span>
-            </label>
+            </div>
           ))
         )}
       </section>

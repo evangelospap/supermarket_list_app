@@ -8,23 +8,38 @@ const certificatePairs = [
   {
     certFile: path.join(certDir, "tailscale-dev.pem"),
     keyFile: path.join(certDir, "tailscale-dev-key.pem"),
+    name: "tailscale",
   },
   {
     certFile: path.join(certDir, "local-dev.pem"),
     keyFile: path.join(certDir, "local-dev-key.pem"),
+    name: "local",
   },
 ];
 
-const httpsConfig = certificatePairs
-  .filter(({ certFile, keyFile }) => existsSync(certFile) && existsSync(keyFile))
-  .map(({ certFile, keyFile }) => ({
-    cert: readFileSync(certFile),
-    key: readFileSync(keyFile),
-  }))[0];
+const selectedCertificatePair = certificatePairs.find(
+  ({ certFile, keyFile }) => existsSync(certFile) && existsSync(keyFile),
+);
+
+const httpsConfig = selectedCertificatePair
+  ? {
+      cert: readFileSync(selectedCertificatePair.certFile),
+      key: readFileSync(selectedCertificatePair.keyFile),
+    }
+  : undefined;
+
+const hmrConfig =
+  selectedCertificatePair?.name === "tailscale"
+    ? {
+        host: process.env.VITE_HMR_HOST ?? "desktop-de1g0tf.tail0276cd.ts.net",
+        protocol: "wss",
+      }
+    : undefined;
 
 export default defineConfig({
   plugins: [react()],
   server: {
+    hmr: hmrConfig,
     host: "0.0.0.0",
     https: httpsConfig,
     proxy: {

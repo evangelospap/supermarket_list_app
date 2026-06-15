@@ -1,7 +1,11 @@
-export function ConfirmModal({ action, onCancel, onConfirm }) {
+export function ConfirmModal({ action, onCancel, onConfirm, onSecondary }) {
   if (!action) {
     return null;
   }
+
+  const confirmClassName = action.confirmClassName ?? "modal-danger";
+  const secondaryLabel = action.secondaryLabel ?? action.cancelLabel ?? "Cancel";
+  const handleSecondary = action.secondaryLabel && onSecondary ? onSecondary : onCancel;
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={onCancel}>
@@ -16,10 +20,10 @@ export function ConfirmModal({ action, onCancel, onConfirm }) {
         <h2 id="confirm-modal-title">{action.title}</h2>
         <p>{action.message}</p>
         <div className="modal-actions">
-          <button type="button" className="modal-secondary" onClick={onCancel}>
-            Άκυρο
+          <button type="button" className="modal-secondary" onClick={handleSecondary}>
+            {secondaryLabel}
           </button>
-          <button type="button" className="modal-danger" onClick={onConfirm}>
+          <button type="button" className={confirmClassName} onClick={onConfirm}>
             {action.confirmLabel}
           </button>
         </div>

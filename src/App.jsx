@@ -7,8 +7,111 @@ import { ShoppingCartPage } from "./components/ShoppingCartPage";
 import { ShoppingList } from "./components/ShoppingList";
 import { loadStoredState, saveStoredState } from "./storage";
 import { normalizeText, suggestCategory } from "./utils/categories";
-import { getRouteFromHash, navigateToHash, readCartSessionIds, writeCartSessionIds } from "./utils/routes";
-import { buildInitialState, isValidState } from "./utils/state";
+import { getRouteFromHash, getViewFromHash, navigateToHash, readCartSessionIds, writeCartSessionIds } from "./utils/routes";
+import { normalizeScannedCode } from "./utils/scanner";
+import { buildInitialState, isValidState, normalizeState } from "./utils/state";
+import { getQuantityNote, normalizeQuantityCount } from "./utils/quantity";
+
+function createShoppingItem({ barcode, category, estimatedPrice = "", name, quantityCount = 1, quantityNote = "" }) {
+  return {
+    barcode,
+    category,
+    createdAt: Date.now(),
+    estimatedPrice,
+    id: crypto.randomUUID?.() ?? `${Date.now()}-${name}`,
+    name,
+    quantityCount: normalizeQuantityCount(quantityCount),
+    quantityNote,
+    status: "needed",
+  };
+}
+
+function findDuplicateItem(items, incomingItem) {
+  const incomingBarcode = normalizeScannedCode(incomingItem.barcode);
+
+  if (incomingBarcode) {
+    const barcodeMatch = items.find((item) => normalizeScannedCode(item.barcode) === incomingBarcode);
+
+    if (barcodeMatch) {
+      return { item: barcodeMatch, matchType: "barcode" };
+    }
+  }
+
+  const incomingName = normalizeText(incomingItem.name);
+
+  if (!incomingName) {
+    return null;
+  }
+
+  const nameMatch = items.find((item) => normalizeText(item.name) === incomingName);
+
+  return nameMatch ? { item: nameMatch, matchType: "name" } : null;
+}
+
+function mergeQuantityNote(existingItem, incomingItem) {
+  const existingNote = getQuantityNote(existingItem).trim();
+  const incomingNote = getQuantityNote(incomingItem).trim();
+
+  if (!incomingNote || existingNote === incomingNote) {
+    return existingNote;
+  }
+
+  if (!existingNote) {
+    return incomingNote;
+  }
+
+  return `${existingNote}; ${incomingNote}`;
+}
+
+function applyLearnedProduct(current, learnedProduct) {
+  if (!learnedProduct) {
+    return current.learnedProducts ?? {};
+  }
+
+  return {
+    ...current.learnedProducts,
+    [learnedProduct.code]: learnedProduct,
+  };
+}
+
+function addItemPayloadToState(current, payload) {
+  const categories = current.categories.includes(payload.item.category)
+    ? current.categories
+    : [...current.categories, payload.item.category];
+
+  return {
+    ...current,
+    categories,
+    learnedProducts: applyLearnedProduct(current, payload.learnedProduct),
+    items: [payload.item, ...current.items],
+  };
+}
+
+function increaseDuplicateQuantityInState(current, pendingDuplicate) {
+  const existingItemId = pendingDuplicate.existingItem.id;
+  const incomingItem = pendingDuplicate.payload.item;
+  const incomingCount = normalizeQuantityCount(incomingItem.quantityCount);
+  const hasExistingItem = current.items.some((item) => item.id === existingItemId);
+
+  if (!hasExistingItem) {
+    return addItemPayloadToState(current, pendingDuplicate.payload);
+  }
+
+  return {
+    ...current,
+    learnedProducts: applyLearnedProduct(current, pendingDuplicate.payload.learnedProduct),
+    items: current.items.map((item) =>
+      item.id === existingItemId
+        ? {
+            ...item,
+            quantityCount: normalizeQuantityCount(item.quantityCount) + incomingCount,
+            quantityNote: mergeQuantityNote(item, incomingItem),
+            status: "needed",
+          }
+        : item,
+    ),
+  };
+}
 
 function App() {
   const [state, setState] = useState(buildInitialState);
@@ -25,14 +128,18 @@ function App() {
   const [pendingDeleteItem, setPendingDeleteItem] = useState(null);
   const [pendingClearCompleted, setPendingClearCompleted] = useState(false);
   const [pendingResetList, setPendingResetList] = useState(false);
+  const [pendingDuplicate, setPendingDuplicate] = useState(null);
+  const [pendingVoiceItems, setPendingVoiceItems] = useState([]);
   const didFinishInitialLoad = useRef(false);
 
   useEffect(() => {
     function syncRouteFromHash() {
       setPage(getRouteFromHash());
 
-      if (globalThis.location.hash === "#/needed") {
-        setView("needed");
+      const routeView = getViewFromHash();
+
+      if (routeView) {
+        setView(routeView);
       }
     }
 
@@ -54,7 +161,7 @@ function App() {
         }
 
         if (isValidState(storedResult?.state)) {
-          setState(storedResult.state);
+          setState(normalizeState(storedResult.state));
         }
 
         setStorageReady(true);
@@ -97,6 +204,15 @@ function App() {
       writeCartSessionIds(neededItemIds);
     }
   }, [cartItemIds.length, page, state.items, storageReady]);
+
+  useEffect(() => {
+    if (pendingDuplicate || pendingVoiceItems.length === 0) {
+      return;
+    }
+
+    addOrQueueDuplicate(pendingVoiceItems[0], "voice");
+    setPendingVoiceItems((current) => current.slice(1));
+  }, [pendingDuplicate, pendingVoiceItems, state.items]);
 
   const guessedCategory = useMemo(() => {
     return draftName ? suggestCategory(draftName) : "Να μην ξεχάσω";
@@ -148,6 +264,64 @@ function App() {
       });
   }, [cartItemIds, state.categories, state.items]);
 
+  function clearAddFlow(source) {
+    if (source === "manual") {
+      setDraftName("");
+      setDraftCategory("auto");
+      setNewCategory("");
+      return;
+    }
+
+    if (source === "quick") {
+      setQuickAddCategory("");
+      setQuickAddName("");
+      return;
+    }
+
+    if (source === "scanned") {
+      setQuery("");
+      setView("all");
+    }
+  }
+
+  function addOrQueueDuplicate(payload, source) {
+    const duplicate = findDuplicateItem(state.items, payload.item);
+
+    if (duplicate) {
+      setPendingDuplicate({
+        existingItem: duplicate.item,
+        matchType: duplicate.matchType,
+        payload,
+        source,
+      });
+      return false;
+    }
+
+    setState((current) => addItemPayloadToState(current, payload));
+    clearAddFlow(source);
+    return true;
+  }
+
+  function confirmIncreaseDuplicateQuantity() {
+    if (!pendingDuplicate) {
+      return;
+    }
+
+    setState((current) => increaseDuplicateQuantityInState(current, pendingDuplicate));
+    clearAddFlow(pendingDuplicate.source);
+    setPendingDuplicate(null);
+  }
+
+  function confirmAddDuplicateSeparately() {
+    if (!pendingDuplicate) {
+      return;
+    }
+
+    setState((current) => addItemPayloadToState(current, pendingDuplicate.payload));
+    clearAddFlow(pendingDuplicate.source);
+    setPendingDuplicate(null);
+  }
+
   function addItem(event) {
     event.preventDefault();
 
@@ -159,57 +333,75 @@ function App() {
       return;
     }
 
-    setState((current) => {
-      const categories = current.categories.includes(category) ? current.categories : [...current.categories, category];
-
-      return {
-        categories,
-        items: [
-          {
-            id: crypto.randomUUID?.() ?? `${Date.now()}-${name}`,
-            name,
-            category,
-            status: "needed",
-            createdAt: Date.now(),
-          },
-          ...current.items,
-        ],
-      };
-    });
-
-    setDraftName("");
-    setDraftCategory("auto");
-    setNewCategory("");
+    addOrQueueDuplicate(
+      {
+        item: createShoppingItem({
+          category,
+          name,
+          quantityCount: 1,
+          quantityNote: "",
+        }),
+      },
+      "manual",
+    );
   }
 
   function addScannedItem({ barcode, category, name }) {
     const trimmedName = name.trim();
+    const normalizedBarcode = normalizeScannedCode(barcode);
 
     if (!trimmedName || !category) {
       return;
     }
 
-    setState((current) => {
-      const categories = current.categories.includes(category) ? current.categories : [...current.categories, category];
+    addOrQueueDuplicate(
+      {
+        item: createShoppingItem({
+          barcode: normalizedBarcode || barcode,
+          category,
+          name: trimmedName,
+          quantityCount: 1,
+          quantityNote: "",
+        }),
+        learnedProduct: normalizedBarcode
+          ? {
+              category,
+              code: normalizedBarcode,
+              name: trimmedName,
+              updatedAt: new Date().toISOString(),
+            }
+          : null,
+      },
+      "scanned",
+    );
+  }
 
-      return {
-        categories,
-        items: [
-          {
-            barcode,
+  function addVoiceItems(stagedItems) {
+    const payloads = stagedItems
+      .map((stagedItem) => {
+        const name = stagedItem.name.trim();
+        const category = stagedItem.category?.trim() || suggestCategory(name);
+
+        if (!name || !category) {
+          return null;
+        }
+
+        return {
+          item: createShoppingItem({
             category,
-            createdAt: Date.now(),
-            id: crypto.randomUUID?.() ?? `${Date.now()}-${trimmedName}`,
-            name: trimmedName,
-            status: "needed",
-          },
-          ...current.items,
-        ],
-      };
-    });
+            name,
+            quantityCount: 1,
+            quantityNote: "",
+          }),
+        };
+      })
+      .filter(Boolean);
 
-    setQuery("");
-    setView("all");
+    if (payloads.length === 0) {
+      return;
+    }
+
+    setPendingVoiceItems((current) => [...current, ...payloads]);
   }
 
   function addItemToCategory(event, category) {
@@ -221,22 +413,17 @@ function App() {
       return;
     }
 
-    setState((current) => ({
-      ...current,
-      items: [
-        {
-          id: crypto.randomUUID?.() ?? `${Date.now()}-${name}`,
-          name,
+    addOrQueueDuplicate(
+      {
+        item: createShoppingItem({
           category,
-          status: "needed",
-          createdAt: Date.now(),
-        },
-        ...current.items,
-      ],
-    }));
-
-    setQuickAddCategory("");
-    setQuickAddName("");
+          name,
+          quantityCount: 1,
+          quantityNote: "",
+        }),
+      },
+      "quick",
+    );
   }
 
   function toggleQuickAdd(category) {
@@ -262,10 +449,26 @@ function App() {
     }));
   }
 
-  function updateItemQuantity(itemId, quantity) {
+  function updateItemQuantityCount(itemId, quantityCount) {
     setState((current) => ({
       ...current,
-      items: current.items.map((item) => (item.id === itemId ? { ...item, quantity } : item)),
+      items: current.items.map((item) =>
+        item.id === itemId ? { ...item, quantityCount: normalizeQuantityCount(quantityCount) } : item,
+      ),
+    }));
+  }
+
+  function updateItemQuantityNote(itemId, quantityNote) {
+    setState((current) => ({
+      ...current,
+      items: current.items.map((item) => (item.id === itemId ? { ...item, quantityNote } : item)),
+    }));
+  }
+
+  function updateItemEstimatedPrice(itemId, estimatedPrice) {
+    setState((current) => ({
+      ...current,
+      items: current.items.map((item) => (item.id === itemId ? { ...item, estimatedPrice } : item)),
     }));
   }
 
@@ -278,6 +481,10 @@ function App() {
 
   function closeShoppingCart() {
     navigateToHash("#/needed");
+  }
+
+  function finishShopping() {
+    navigateToHash("#/have");
   }
 
   function confirmRemoveItem() {
@@ -311,9 +518,26 @@ function App() {
     setPendingDeleteItem(null);
     setPendingClearCompleted(false);
     setPendingResetList(false);
+    setPendingDuplicate(null);
+    setPendingVoiceItems([]);
   }
 
-  const pendingConfirmAction = pendingDeleteItem
+  const pendingConfirmAction = pendingDuplicate
+    ? {
+        confirmClassName: "modal-primary",
+        confirmLabel: "Αύξηση ποσότητας",
+        eyebrow: "Πιθανό διπλό προϊόν",
+        message: (
+          <>
+            Το <strong>{pendingDuplicate.payload.item.name}</strong> μοιάζει να υπάρχει ήδη στη λίστα ως{" "}
+            <strong>{pendingDuplicate.existingItem.name}</strong>. Το βρήκα από{" "}
+            {pendingDuplicate.matchType === "barcode" ? "barcode" : "όνομα"}.
+          </>
+        ),
+        secondaryLabel: "Βάλ' το ξεχωριστά",
+        title: "Να χρησιμοποιήσω το υπάρχον προϊόν;",
+      }
+    : pendingDeleteItem
     ? {
         confirmLabel: "Διαγραφή",
         eyebrow: "Επιβεβαίωση διαγραφής",
@@ -342,7 +566,15 @@ function App() {
       : null;
 
   if (page === "cart") {
-    return <ShoppingCartPage items={cartItems} onBack={closeShoppingCart} onToggleTaken={toggleItemStatus} />;
+    return (
+      <ShoppingCartPage
+        items={cartItems}
+        onBack={closeShoppingCart}
+        onFinishShopping={finishShopping}
+        onToggleTaken={toggleItemStatus}
+        onUpdateItemEstimatedPrice={updateItemEstimatedPrice}
+      />
+    );
   }
 
   return (
@@ -360,6 +592,7 @@ function App() {
           view={view}
           onAddItem={addItem}
           onAddScannedItem={addScannedItem}
+          onAddVoiceItems={addVoiceItems}
           onClearCompleted={() => setPendingClearCompleted(true)}
           onDraftCategoryChange={setDraftCategory}
           onDraftNameChange={setDraftName}
@@ -380,18 +613,26 @@ function App() {
           onToggleItemStatus={toggleItemStatus}
           onToggleNotNeededStatus={toggleNotNeededStatus}
           onToggleQuickAdd={toggleQuickAdd}
-          onUpdateItemQuantity={updateItemQuantity}
+          onUpdateItemEstimatedPrice={updateItemEstimatedPrice}
+          onUpdateItemQuantityCount={updateItemQuantityCount}
+          onUpdateItemQuantityNote={updateItemQuantityNote}
         />
       </section>
 
       <ConfirmModal
         action={pendingConfirmAction}
         onCancel={() => {
+          setPendingDuplicate(null);
           setPendingDeleteItem(null);
           setPendingClearCompleted(false);
           setPendingResetList(false);
         }}
         onConfirm={() => {
+          if (pendingDuplicate) {
+            confirmIncreaseDuplicateQuantity();
+            return;
+          }
+
           if (pendingDeleteItem) {
             confirmRemoveItem();
             return;
@@ -405,6 +646,11 @@ function App() {
 
           if (pendingResetList) {
             resetList();
+          }
+        }}
+        onSecondary={() => {
+          if (pendingDuplicate) {
+            confirmAddDuplicateSeparately();
           }
         }}
       />

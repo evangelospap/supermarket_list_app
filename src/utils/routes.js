@@ -1,7 +1,17 @@
 const CART_SESSION_KEY = "supermarket-cart-session-ids";
+const VIEW_BY_HASH = {
+  "#/": "all",
+  "#/have": "have",
+  "#/needed": "needed",
+  "#/not-needed": "notNeeded",
+};
 
 export function getRouteFromHash() {
   return window.location.hash === "#/cart" ? "cart" : "dashboard";
+}
+
+export function getViewFromHash() {
+  return VIEW_BY_HASH[window.location.hash] ?? null;
 }
 
 export function readCartSessionIds() {
