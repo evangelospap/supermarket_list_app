@@ -10,7 +10,7 @@ export function ShoppingCartPage({ items, onBack, onToggleTaken }) {
       <section className="cart-hero">
         <div>
           <p className="eyebrow">Το καλάθι μου</p>
-          <h1>Checklist για το supermarket.</h1>
+          <h2>Checklist για το supermarket.</h2>
           <p className="dashboard-note">Τσέκαρε κάθε προϊόν όταν το βάλεις στο καλάθι. Οι επιλογές σώζονται στη λίστα σου.</p>
         </div>
         <button className="cart-back-button" type="button" onClick={onBack}>
