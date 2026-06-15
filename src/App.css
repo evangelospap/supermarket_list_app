@@ -1181,6 +1181,10 @@ button:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .list-area {
+    scroll-margin-top: 96px;
+  }
+
   .controls-panel {
     position: static;
   }
@@ -1215,6 +1219,7 @@ button:focus-visible {
   /* Category cards and product rows. */
 .list-area {
     grid-template-columns: 1fr;
+    scroll-margin-top: 164px;
   }
 
   .category-card header {

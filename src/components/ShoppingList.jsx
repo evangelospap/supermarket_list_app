@@ -224,6 +224,7 @@ function CategoryCard({
 
 export function ShoppingList({
   itemsByCategory,
+  productsSectionRef,
   quickAddCategory,
   quickAddName,
   onAddItemToCategory,
@@ -239,7 +240,7 @@ export function ShoppingList({
 }) {
   if (itemsByCategory.length === 0) {
     return (
-      <section className="list-area" aria-label="Λίστα προϊόντων">
+      <section className="list-area" ref={productsSectionRef} aria-label="Λίστα προϊόντων">
         <div className="empty-state">
           <h2>Δεν βρέθηκαν προϊόντα.</h2>
           <p>Άλλαξε φίλτρο ή πρόσθεσε κάτι καινούριο από την αριστερή πλευρά.</p>
@@ -249,7 +250,7 @@ export function ShoppingList({
   }
 
   return (
-    <section className="list-area" aria-label="Λίστα προϊόντων">
+    <section className="list-area" ref={productsSectionRef} aria-label="Λίστα προϊόντων">
       {itemsByCategory.map((group) => (
         <CategoryCard
           group={group}

@@ -150,6 +150,7 @@ function App() {
   const [pendingVoiceItems, setPendingVoiceItems] = useState([]);
   const [showPriceFields, setShowPriceFields] = useState(readStoredPriceFieldsVisibility);
   const didFinishInitialLoad = useRef(false);
+  const productsSectionRef = useRef(null);
 
   useEffect(() => {
     function syncRouteFromHash() {
@@ -499,6 +500,26 @@ function App() {
     });
   }
 
+  function scrollToProductsOnMobile() {
+    if (!globalThis.matchMedia?.("(max-width: 920px)").matches) {
+      return;
+    }
+
+    globalThis.requestAnimationFrame(() => {
+      const prefersReducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+      productsSectionRef.current?.scrollIntoView({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "start",
+      });
+    });
+  }
+
+  function changeViewFromNavigation(nextView) {
+    setView(nextView);
+    scrollToProductsOnMobile();
+  }
+
   function openShoppingCart() {
     const neededItemIds = state.items.filter((item) => item.status === "needed").map((item) => item.id);
     setCartItemIds(neededItemIds);
@@ -611,7 +632,7 @@ function App() {
 
   return (
     <main className="app-shell">
-      <DashboardHeader totals={totals} view={view} onOpenCart={openShoppingCart} onViewChange={setView} />
+      <DashboardHeader totals={totals} view={view} onOpenCart={openShoppingCart} onViewChange={changeViewFromNavigation} />
 
       <section className="workspace">
         <ControlsPanel
@@ -632,12 +653,13 @@ function App() {
           onQueryChange={setQuery}
           onResetList={() => setPendingResetList(true)}
           onTogglePriceFields={togglePriceFields}
-          onViewChange={setView}
+          onViewChange={changeViewFromNavigation}
           showPriceFields={showPriceFields}
         />
 
         <ShoppingList
           itemsByCategory={itemsByCategory}
+          productsSectionRef={productsSectionRef}
           view={view}
           quickAddCategory={quickAddCategory}
           quickAddName={quickAddName}
