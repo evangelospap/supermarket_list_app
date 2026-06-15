@@ -27,6 +27,15 @@ const processes = [
     process.stderr.write(prefixLines(label, chunk));
   });
 
+  child.on("error", (error) => {
+    if (isShuttingDown) {
+      return;
+    }
+
+    console.error(`[${label}] failed to start: ${error.message}`);
+    shutdown(1);
+  });
+
   child.on("exit", (code, signal) => {
     if (isShuttingDown) {
       return;
@@ -56,7 +65,12 @@ function shutdown(exitCode = 0) {
   isShuttingDown = true;
 
   for (const child of processes) {
-    if (!child.killed) {
+    if (isWindows && child.pid) {
+      spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+        stdio: "ignore",
+        windowsHide: true,
+      });
+    } else if (!child.killed) {
       child.kill("SIGTERM");
     }
   }
