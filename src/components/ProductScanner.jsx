@@ -162,7 +162,7 @@ export function ProductScanner({ categories, onAddScannedItem }) {
       {/* <label>Στάδιο 1: αναγνώριση προϊόντος</label> */}
       <button className="scanner-button" type="button" onClick={() => setCameraOpen((current) => !current)}>
         <span className="button-icon" aria-hidden="true">▣</span>
-        <span>{cameraOpen ? "Κλείσιμο κάμερας" : "Scan barcode / QR"}</span>
+        <span>{cameraOpen ? "Κλείσιμο κάμερας" : "Scan barcode"}</span>
       </button>
 
       {cameraOpen ? (
@@ -176,7 +176,7 @@ export function ProductScanner({ categories, onAddScannedItem }) {
         <input
           value={manualCode}
           onChange={(event) => setManualCode(event.target.value)}
-          placeholder="ή γράψε barcode / QR code"
+          placeholder="ή γράψε barcode "
         />
         <button type="submit">Αναγνώριση</button>
       </form>
