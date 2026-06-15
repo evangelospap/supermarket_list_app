@@ -944,6 +944,30 @@ button:focus-visible {
   margin: 0;
 }
 
+.scroll-top-button {
+  align-items: center;
+  background: var(--primary);
+  border: 1px solid var(--primary-strong);
+  border-radius: 999px;
+  bottom: 18px;
+  box-shadow: 0 12px 28px rgba(15, 99, 27, 0.24);
+  color: var(--surface);
+  display: inline-flex;
+  font-size: 1.35rem;
+  font-weight: 900;
+  height: 46px;
+  justify-content: center;
+  line-height: 1;
+  position: fixed;
+  right: 18px;
+  width: 46px;
+  z-index: 30;
+}
+
+.scroll-top-button:hover {
+  background: var(--primary-strong);
+}
+
 /* Responsive behavior for tablet and mobile use in the supermarket. */
 @media (max-width: 920px) {
   /* Page shell and dashboard header. */
@@ -1035,13 +1059,21 @@ button:focus-visible {
   }
 
   .stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .stat-card,
   .stats .shopping-nav-button {
-    min-height: 64px;
-    padding: 8px 10px;
+    min-height: 58px;
+    padding: 7px 8px;
+  }
+
+  .stat-card {
+    gap: 4px;
+  }
+
+  .stat-card small {
+    font-size: 0.68rem;
   }
 
   .total-card {
@@ -1049,11 +1081,26 @@ button:focus-visible {
   }
 
   .stats .shopping-nav-button {
-    grid-column: 2;
+    grid-column: 2 / 4;
+    min-height: 58px;
   }
 
   .stats strong {
-    font-size: 1.55rem;
+    font-size: 1.42rem;
+  }
+
+  .shopping-basket-icon {
+    height: 26px;
+    width: 34px;
+  }
+
+  .shopping-basket-icon svg {
+    height: 20px;
+    width: 20px;
+  }
+
+  .shopping-nav-label {
+    font-size: 0.72rem;
   }
 
   .category-card {
@@ -1162,5 +1209,12 @@ button:focus-visible {
   .cart-item-status {
     grid-column: 2;
     justify-self: start;
+  }
+
+  .scroll-top-button {
+    bottom: 14px;
+    height: 42px;
+    right: 14px;
+    width: 42px;
   }
 }
