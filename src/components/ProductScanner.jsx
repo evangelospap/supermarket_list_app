@@ -77,7 +77,7 @@ export function ProductScanner({ categories, onAddScannedItem }) {
       }
 
       if (!("BarcodeDetector" in window)) {
-        setCameraMessage("Ο browser έχει κάμερα, αλλά δεν έχει ενσωματωμένο barcode scanner. Σε Firefox γράψε τον κωδικό από κάτω.");
+        setCameraMessage("Ο browser έχει κάμερα, αλλά δεν έχει ενσωματωμένο barcode scanner. Σε browser γράψε τον κωδικό από κάτω.");
         return;
       }
 

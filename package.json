@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
+    "dev:all": "node scripts/dev-all.js",
     "dev:backend": "node backend/server.js",
     "build": "vite build",
     "preview": "vite preview",
