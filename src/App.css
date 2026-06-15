@@ -229,8 +229,8 @@ h1 {
 
 .section-label {
   color: var(--text-muted);
-  font-size: 0.68rem;
-  font-weight: 800;
+  font-size: 0.9rem;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -502,6 +502,72 @@ button:focus-visible {
   justify-content: center;
   line-height: 1;
   width: 16px;
+}
+
+.home-snapshots {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+  padding-top: 14px;
+}
+
+.home-snapshots p {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.home-snapshots ol {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.home-snapshots li {
+  align-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 7px 8px;
+}
+
+.home-snapshot-summary {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.home-snapshots strong {
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.home-snapshots span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.home-snapshot-restore {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--primary-strong);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 850;
+  padding: 5px 8px;
+}
+
+.home-snapshot-restore:hover {
+  border-color: var(--primary);
 }
 
 /* Category cards and product rows. */
@@ -1064,10 +1130,10 @@ button:focus-visible {
   align-items: center;
   border-bottom: 1px solid #eeeeee;
   display: grid;
-  gap: 12px;
+  gap: 10px;
   grid-template-columns: auto minmax(0, 1fr);
-  min-height: 64px;
-  padding: 12px 14px;
+  min-height: 52px;
+  padding: 9px 12px;
 }
 
 .cart-item:last-child {
@@ -1082,7 +1148,15 @@ button:focus-visible {
 
 .cart-item-main {
   display: grid;
-  gap: 3px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cart-item-title {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
   min-width: 0;
 }
 
@@ -1093,7 +1167,6 @@ button:focus-visible {
   overflow-wrap: break-word;
 }
 
-.cart-item-category,
 .cart-item-quantity,
 .cart-price-field {
   color: var(--text-muted);
@@ -1101,8 +1174,20 @@ button:focus-visible {
   font-weight: 800;
 }
 
+.cart-item-category {
+  align-items: center;
+  color: var(--text-muted);
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: 800;
+  gap: 3px;
+  line-height: 1;
+  opacity: 0.58;
+}
+
 .cart-item-quantity {
   color: #7b4b00;
+  font-size: 0.72rem;
 }
 
 .cart-price-field {

@@ -54,9 +54,19 @@ function normalizeItem(item) {
   };
 }
 
+function normalizeHomeSnapshot(snapshot) {
+  return {
+    ...snapshot,
+    createdAt: typeof snapshot?.createdAt === "string" ? snapshot.createdAt : new Date().toISOString(),
+    id: typeof snapshot?.id === "string" ? snapshot.id : `home-${Date.now()}`,
+    items: Array.isArray(snapshot?.items) ? snapshot.items.map(normalizeItem) : [],
+  };
+}
+
 export function normalizeState(value) {
   return {
     ...value,
+    homeSnapshots: Array.isArray(value?.homeSnapshots) ? value.homeSnapshots.map(normalizeHomeSnapshot) : [],
     items: Array.isArray(value?.items) ? value.items.map(normalizeItem) : [],
     learnedProducts: value?.learnedProducts ?? {},
   };
@@ -65,6 +75,7 @@ export function normalizeState(value) {
 export function buildInitialState() {
   return {
     categories: DEFAULT_CATEGORIES,
+    homeSnapshots: [],
     items: STARTER_ITEMS.map(normalizeItem),
     learnedProducts: {},
   };

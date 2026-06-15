@@ -86,9 +86,12 @@ export function ShoppingCartPage({
                   type="checkbox"
                 />
                 <span className="cart-item-main">
-                  <span className="cart-item-name">{getCartItemName(item)}</span>
-                  <span className="cart-item-category">
-                    {getCategoryIcon(item.category)} {item.category}
+                  <span className="cart-item-title">
+                    <span className="cart-item-name">{getCartItemName(item)}</span>
+                    <span className="cart-item-category">
+                      <span aria-hidden="true">{getCategoryIcon(item.category)}</span>
+                      <span>{item.category}</span>
+                    </span>
                   </span>
                   {quantityNote ? <span className="cart-item-quantity">{quantityNote}</span> : null}
                   {showPriceFields ? (

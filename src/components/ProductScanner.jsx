@@ -158,8 +158,8 @@ export function ProductScanner({ categories, onAddScannedItem }) {
 
   return (
     <section className="scanner-panel" aria-label="Scanner προϊόντος">
-      <div className="section-label">Scanner</div>
-      <label>Στάδιο 1: αναγνώριση προϊόντος</label>
+      <div className="section-label">Scan για προσθήκη</div>
+      {/* <label>Στάδιο 1: αναγνώριση προϊόντος</label> */}
       <button className="scanner-button" type="button" onClick={() => setCameraOpen((current) => !current)}>
         <span className="button-icon" aria-hidden="true">▣</span>
         <span>{cameraOpen ? "Κλείσιμο κάμερας" : "Scan barcode / QR"}</span>

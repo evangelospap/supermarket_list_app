@@ -2,11 +2,13 @@ export function AddItemForm({
   categories,
   draftCategory,
   draftName,
+  draftQuantityCount,
   guessedCategory,
   newCategory,
   onAddItem,
   onDraftCategoryChange,
   onDraftNameChange,
+  onDraftQuantityCountChange,
   onNewCategoryChange,
 }) {
   return (
@@ -35,6 +37,23 @@ export function AddItemForm({
           </option>
         ))}
       </select>
+
+      {/* <label htmlFor="item-quantity">Ποσότητα για αγορά</label>
+      <input
+        id="item-quantity"
+        inputMode="numeric"
+        min="1"
+        pattern="[0-9]*"
+        type="text"
+        value={draftQuantityCount}
+        onBlur={(event) => {
+          if (!event.target.value.trim()) {
+            onDraftQuantityCountChange("1");
+          }
+        }}
+        onChange={(event) => onDraftQuantityCountChange(event.target.value.replace(/\D/g, ""))}
+        placeholder="1"
+      /> */}
 
       <label htmlFor="new-category">Ή νέα κατηγορία</label>
       <input

@@ -13,6 +13,7 @@ import { buildInitialState, isValidState, normalizeState } from "./utils/state";
 import { getQuantityNote, normalizeQuantityCount } from "./utils/quantity";
 
 const PRICE_FIELDS_STORAGE_KEY = "supermarket-show-price-fields";
+const MAX_HOME_SNAPSHOTS = 20;
 
 function readStoredPriceFieldsVisibility() {
   try {
@@ -45,25 +46,71 @@ function createShoppingItem({ barcode, category, estimatedPrice = "", name, quan
 }
 
 function findDuplicateItem(items, incomingItem) {
+  const matches = items
+    .map((item) => ({
+      item,
+      matchType: getProductMatchType(item, incomingItem),
+    }))
+    .filter((match) => match.matchType);
+
+  return (
+    matches.find((match) => match.item.status === incomingItem.status) ??
+    matches.find((match) => match.item.status !== "have") ??
+    null
+  );
+}
+
+function getProductMatchType(item, incomingItem) {
   const incomingBarcode = normalizeScannedCode(incomingItem.barcode);
+  const itemBarcode = normalizeScannedCode(item.barcode);
 
-  if (incomingBarcode) {
-    const barcodeMatch = items.find((item) => normalizeScannedCode(item.barcode) === incomingBarcode);
-
-    if (barcodeMatch) {
-      return { item: barcodeMatch, matchType: "barcode" };
-    }
+  if (incomingBarcode && itemBarcode === incomingBarcode) {
+    return "barcode";
   }
 
   const incomingName = normalizeText(incomingItem.name);
 
-  if (!incomingName) {
-    return null;
+  if (incomingName && normalizeText(item.name) === incomingName) {
+    return "name";
   }
 
-  const nameMatch = items.find((item) => normalizeText(item.name) === incomingName);
+  return null;
+}
 
-  return nameMatch ? { item: nameMatch, matchType: "name" } : null;
+function findMatchingProductItem(items, targetItem, { excludeId, status } = {}) {
+  return items.find(
+    (item) =>
+      item.id !== excludeId &&
+      (!status || item.status === status) &&
+      Boolean(getProductMatchType(item, targetItem)),
+  );
+}
+
+function mergeItemQuantity(existingItem, incomingItem, status = existingItem.status) {
+  return {
+    ...existingItem,
+    barcode: existingItem.barcode || incomingItem.barcode,
+    estimatedPrice: existingItem.estimatedPrice || incomingItem.estimatedPrice,
+    quantityCount: normalizeQuantityCount(existingItem.quantityCount) + normalizeQuantityCount(incomingItem.quantityCount),
+    quantityNote: mergeQuantityNote(existingItem, incomingItem),
+    status,
+  };
+}
+
+function addOrIncreaseNeededItemInState(current, payload) {
+  const existingNeededItem = findMatchingProductItem(current.items, payload.item, { status: "needed" });
+
+  if (!existingNeededItem) {
+    return addItemPayloadToState(current, payload);
+  }
+
+  return {
+    ...current,
+    learnedProducts: applyLearnedProduct(current, payload.learnedProduct),
+    items: current.items.map((item) =>
+      item.id === existingNeededItem.id ? mergeItemQuantity(item, payload.item, "needed") : item,
+    ),
+  };
 }
 
 function mergeQuantityNote(existingItem, incomingItem) {
@@ -105,10 +152,160 @@ function addItemPayloadToState(current, payload) {
   };
 }
 
+function buildNeededCounterpartPayload(payload, existingHaveItem) {
+  if (!existingHaveItem) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    item: {
+      ...payload.item,
+      barcode: payload.item.barcode || existingHaveItem.barcode,
+      category: existingHaveItem.category,
+      estimatedPrice: payload.item.estimatedPrice || existingHaveItem.estimatedPrice,
+    },
+  };
+}
+
+function buildHomeSnapshot(items) {
+  const snapshotItems = items
+    .filter((item) => item.status === "have")
+    .map((item) => ({
+      barcode: item.barcode,
+      category: item.category,
+      estimatedPrice: item.estimatedPrice,
+      id: item.id,
+      name: item.name,
+      quantityCount: normalizeQuantityCount(item.quantityCount),
+      quantityNote: getQuantityNote(item),
+    }))
+    .sort((a, b) => a.category.localeCompare(b.category, "el") || a.name.localeCompare(b.name, "el"));
+
+  if (snapshotItems.length === 0) {
+    return null;
+  }
+
+  return {
+    createdAt: new Date().toISOString(),
+    id: crypto.randomUUID?.() ?? `home-${Date.now()}`,
+    items: snapshotItems,
+  };
+}
+
+function formatSnapshotDate(value) {
+  try {
+    return new Intl.DateTimeFormat("el-GR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return "Άγνωστη ώρα";
+  }
+}
+
+function mergeHaveItemsIntoNeeded(items) {
+  return items.reduce((nextItems, item) => {
+    if (item.status !== "have") {
+      return [...nextItems, item];
+    }
+
+    const neededMatchIndex = nextItems.findIndex(
+      (existingItem) => existingItem.status === "needed" && getProductMatchType(existingItem, item),
+    );
+
+    if (neededMatchIndex === -1) {
+      return [...nextItems, { ...item, status: "needed" }];
+    }
+
+    return nextItems.map((existingItem, index) =>
+      index === neededMatchIndex ? mergeItemQuantity(existingItem, item, "needed") : existingItem,
+    );
+  }, []);
+}
+
+function resetHaveItemsAndRecordSnapshot(current) {
+  const snapshot = buildHomeSnapshot(current.items);
+
+  return {
+    ...current,
+    homeSnapshots: snapshot ? [snapshot, ...(current.homeSnapshots ?? [])].slice(0, MAX_HOME_SNAPSHOTS) : current.homeSnapshots ?? [],
+    items: mergeHaveItemsIntoNeeded(current.items),
+  };
+}
+
+function addNeededItemMerging(items, neededItem) {
+  const neededMatchIndex = items.findIndex(
+    (existingItem) => existingItem.status === "needed" && getProductMatchType(existingItem, neededItem),
+  );
+
+  if (neededMatchIndex === -1) {
+    return [...items, neededItem];
+  }
+
+  return items.map((existingItem, index) =>
+    index === neededMatchIndex ? mergeItemQuantity(existingItem, neededItem, "needed") : existingItem,
+  );
+}
+
+function createRestoredHaveItem(snapshotItem, existingItem) {
+  return {
+    ...existingItem,
+    barcode: snapshotItem.barcode || existingItem?.barcode,
+    category: snapshotItem.category,
+    createdAt: existingItem?.createdAt ?? Date.now(),
+    estimatedPrice: snapshotItem.estimatedPrice ?? existingItem?.estimatedPrice ?? "",
+    id: existingItem?.id ?? crypto.randomUUID?.() ?? `home-restore-${Date.now()}-${snapshotItem.name}`,
+    name: snapshotItem.name,
+    quantityCount: normalizeQuantityCount(snapshotItem.quantityCount),
+    quantityNote: getQuantityNote(snapshotItem),
+    status: "have",
+  };
+}
+
+function restoreHomeSnapshot(current, snapshotId) {
+  const snapshot = (current.homeSnapshots ?? []).find((entry) => entry.id === snapshotId);
+
+  if (!snapshot) {
+    return current;
+  }
+
+  const snapshotItems = snapshot.items ?? [];
+  const restoredSnapshotIndexes = new Set();
+
+  const itemsWithRestoredHave = current.items.reduce((nextItems, item) => {
+    if (item.status !== "have") {
+      return [...nextItems, item];
+    }
+
+    const snapshotIndex = snapshotItems.findIndex(
+      (snapshotItem, index) => !restoredSnapshotIndexes.has(index) && getProductMatchType(item, snapshotItem),
+    );
+
+    if (snapshotIndex === -1) {
+      return addNeededItemMerging(nextItems, { ...item, status: "needed" });
+    }
+
+    restoredSnapshotIndexes.add(snapshotIndex);
+    return [...nextItems, createRestoredHaveItem(snapshotItems[snapshotIndex], item)];
+  }, []);
+
+  const missingRestoredItems = snapshotItems
+    .filter((_, index) => !restoredSnapshotIndexes.has(index))
+    .map((snapshotItem) => createRestoredHaveItem(snapshotItem));
+
+  const snapshotCategories = snapshotItems.map((item) => item.category).filter(Boolean);
+
+  return {
+    ...current,
+    categories: [...new Set([...current.categories, ...snapshotCategories])],
+    items: [...missingRestoredItems, ...itemsWithRestoredHave],
+  };
+}
+
 function increaseDuplicateQuantityInState(current, pendingDuplicate) {
   const existingItemId = pendingDuplicate.existingItem.id;
   const incomingItem = pendingDuplicate.payload.item;
-  const incomingCount = normalizeQuantityCount(incomingItem.quantityCount);
   const hasExistingItem = current.items.some((item) => item.id === existingItemId);
 
   if (!hasExistingItem) {
@@ -119,15 +316,38 @@ function increaseDuplicateQuantityInState(current, pendingDuplicate) {
     ...current,
     learnedProducts: applyLearnedProduct(current, pendingDuplicate.payload.learnedProduct),
     items: current.items.map((item) =>
-      item.id === existingItemId
-        ? {
-            ...item,
-            quantityCount: normalizeQuantityCount(item.quantityCount) + incomingCount,
-            quantityNote: mergeQuantityNote(item, incomingItem),
-            status: "needed",
-          }
-        : item,
+      item.id === existingItemId ? mergeItemQuantity(item, incomingItem, "needed") : item,
     ),
+  };
+}
+
+function mergeBoughtItemIntoStock(current, itemId) {
+  const itemToMarkHave = current.items.find((item) => item.id === itemId);
+
+  if (!itemToMarkHave || itemToMarkHave.status === "have") {
+    return {
+      ...current,
+      items: current.items.map((item) => (item.id === itemId ? { ...item, status: "needed" } : item)),
+    };
+  }
+
+  const existingHaveItem = findMatchingProductItem(current.items, itemToMarkHave, {
+    excludeId: itemId,
+    status: "have",
+  });
+
+  if (!existingHaveItem) {
+    return {
+      ...current,
+      items: current.items.map((item) => (item.id === itemId ? { ...item, status: "have" } : item)),
+    };
+  }
+
+  return {
+    ...current,
+    items: current.items
+      .map((item) => (item.id === existingHaveItem.id ? mergeItemQuantity(item, itemToMarkHave, "have") : item))
+      .filter((item) => item.id !== itemId),
   };
 }
 
@@ -136,6 +356,7 @@ function App() {
   const [storageReady, setStorageReady] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftCategory, setDraftCategory] = useState("auto");
+  const [draftQuantityCount, setDraftQuantityCount] = useState("1");
   const [newCategory, setNewCategory] = useState("");
   const [quickAddCategory, setQuickAddCategory] = useState("");
   const [quickAddName, setQuickAddName] = useState("");
@@ -146,6 +367,7 @@ function App() {
   const [pendingDeleteItem, setPendingDeleteItem] = useState(null);
   const [pendingClearCompleted, setPendingClearCompleted] = useState(false);
   const [pendingResetList, setPendingResetList] = useState(false);
+  const [pendingRestoreSnapshot, setPendingRestoreSnapshot] = useState(null);
   const [pendingDuplicate, setPendingDuplicate] = useState(null);
   const [pendingVoiceItems, setPendingVoiceItems] = useState([]);
   const [showPriceFields, setShowPriceFields] = useState(readStoredPriceFieldsVisibility);
@@ -288,6 +510,7 @@ function App() {
     if (source === "manual") {
       setDraftName("");
       setDraftCategory("auto");
+      setDraftQuantityCount("1");
       setNewCategory("");
       return;
     }
@@ -317,7 +540,10 @@ function App() {
       return false;
     }
 
-    setState((current) => addItemPayloadToState(current, payload));
+    const existingHaveItem = findMatchingProductItem(state.items, payload.item, { status: "have" });
+    const nextPayload = buildNeededCounterpartPayload(payload, existingHaveItem);
+
+    setState((current) => addOrIncreaseNeededItemInState(current, nextPayload));
     clearAddFlow(source);
     return true;
   }
@@ -358,7 +584,7 @@ function App() {
         item: createShoppingItem({
           category,
           name,
-          quantityCount: 1,
+          quantityCount: normalizeQuantityCount(Number(draftQuantityCount)),
           quantityNote: "",
         }),
       },
@@ -452,12 +678,7 @@ function App() {
   }
 
   function toggleItemStatus(itemId) {
-    setState((current) => ({
-      ...current,
-      items: current.items.map((item) =>
-        item.id === itemId ? { ...item, status: item.status === "have" ? "needed" : "have" } : item,
-      ),
-    }));
+    setState((current) => mergeBoughtItemIntoStock(current, itemId));
   }
 
   function toggleNotNeededStatus(itemId) {
@@ -555,16 +776,31 @@ function App() {
   }
 
   function resetHaveItems() {
-    setState((current) => ({
-      ...current,
-      items: current.items.map((item) => (item.status === "have" ? { ...item, status: "needed" } : item)),
-    }));
+    setState((current) => resetHaveItemsAndRecordSnapshot(current));
     setQuery("");
     setView("needed");
     navigateToHash("#/needed");
     setPendingDeleteItem(null);
     setPendingClearCompleted(false);
     setPendingResetList(false);
+    setPendingRestoreSnapshot(null);
+    setPendingDuplicate(null);
+    setPendingVoiceItems([]);
+  }
+
+  function restoreSnapshot() {
+    if (!pendingRestoreSnapshot) {
+      return;
+    }
+
+    setState((current) => restoreHomeSnapshot(current, pendingRestoreSnapshot.id));
+    setQuery("");
+    setView("have");
+    navigateToHash("#/have");
+    setPendingDeleteItem(null);
+    setPendingClearCompleted(false);
+    setPendingResetList(false);
+    setPendingRestoreSnapshot(null);
     setPendingDuplicate(null);
     setPendingVoiceItems([]);
   }
@@ -574,12 +810,25 @@ function App() {
     confirmLabel: "Reset Έχω σπίτι",
     eyebrow: "Επιβεβαίωση reset",
     message:
-      "Θέλεις να επιστρέψουν όλα τα προϊόντα από Έχω σπίτι πίσω στο Χρειάζομαι; Δεν θα διαγραφούν προϊόντα, ποσότητες, τιμές ή barcode.",
+      "Θέλεις να αποθηκευτεί πρώτα καταγραφή του Έχω σπίτι και μετά να επιστρέψουν τα προϊόντα στο Χρειάζομαι; Θα κρατηθούν ποσότητες, σημειώσεις, τιμές και barcode στο ιστορικό.",
     title: "Reset για όσα έχω σπίτι;",
   };
 
   const pendingConfirmAction = pendingResetList
     ? resetHaveItemsConfirmAction
+    : pendingRestoreSnapshot
+    ? {
+        confirmClassName: "modal-primary",
+        confirmLabel: "Επαναφορά",
+        eyebrow: "Επαναφορά snapshot",
+        message: (
+          <>
+            Θέλεις να επαναφέρεις την καταγραφή <strong>{formatSnapshotDate(pendingRestoreSnapshot.createdAt)}</strong> ως το τρέχον{" "}
+            <strong>Έχω σπίτι</strong>; Θα κρατηθούν οι ποσότητες, σημειώσεις, τιμές και barcodes του snapshot.
+          </>
+        ),
+        title: "Να γίνει restore του σπιτιού;",
+      }
     : pendingDuplicate
     ? {
         confirmClassName: "modal-primary",
@@ -639,7 +888,9 @@ function App() {
           categories={state.categories}
           draftCategory={draftCategory}
           draftName={draftName}
+          draftQuantityCount={draftQuantityCount}
           guessedCategory={guessedCategory}
+          homeSnapshots={state.homeSnapshots ?? []}
           newCategory={newCategory}
           query={query}
           view={view}
@@ -649,9 +900,11 @@ function App() {
           onClearCompleted={() => setPendingClearCompleted(true)}
           onDraftCategoryChange={setDraftCategory}
           onDraftNameChange={setDraftName}
+          onDraftQuantityCountChange={setDraftQuantityCount}
           onNewCategoryChange={setNewCategory}
           onQueryChange={setQuery}
           onResetList={() => setPendingResetList(true)}
+          onRestoreHomeSnapshot={setPendingRestoreSnapshot}
           onTogglePriceFields={togglePriceFields}
           onViewChange={changeViewFromNavigation}
           showPriceFields={showPriceFields}
@@ -683,6 +936,7 @@ function App() {
           setPendingDeleteItem(null);
           setPendingClearCompleted(false);
           setPendingResetList(false);
+          setPendingRestoreSnapshot(null);
         }}
         onConfirm={() => {
           if (pendingDuplicate) {
@@ -703,6 +957,11 @@ function App() {
 
           if (pendingResetList) {
             resetHaveItems();
+            return;
+          }
+
+          if (pendingRestoreSnapshot) {
+            restoreSnapshot();
           }
         }}
         onSecondary={() => {

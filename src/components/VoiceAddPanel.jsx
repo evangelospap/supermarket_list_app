@@ -140,7 +140,7 @@ export function VoiceAddPanel({ categories, onAddVoiceItems }) {
   if (!isSupported) {
     return (
       <section className="voice-panel" aria-label="Φωνητική προσθήκη">
-        <div className="section-label">Φωνή</div>
+        <div className="section-label">Βρες το με Φωνή</div>
         <p className="voice-fallback">Η φωνητική προσθήκη δεν υποστηρίζεται σε αυτόν τον browser.</p>
       </section>
     );
@@ -148,7 +148,7 @@ export function VoiceAddPanel({ categories, onAddVoiceItems }) {
 
   return (
     <section className="voice-panel" aria-label="Φωνητική προσθήκη">
-      <div className="section-label">Φωνή</div>
+      <div className="section-label">Βρες το με Φωνή</div>
       <div className="voice-actions">
         <button type="button" onClick={isListening ? stopListening : startListening}>
           {isListening ? "Σταμάτα" : "Πες προϊόντα"}

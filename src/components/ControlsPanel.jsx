@@ -7,7 +7,9 @@ export function ControlsPanel({
   categories,
   draftCategory,
   draftName,
+  draftQuantityCount,
   guessedCategory,
+  homeSnapshots = [],
   newCategory,
   query,
   view,
@@ -17,9 +19,11 @@ export function ControlsPanel({
   onClearCompleted,
   onDraftCategoryChange,
   onDraftNameChange,
+  onDraftQuantityCountChange,
   onNewCategoryChange,
   onQueryChange,
   onResetList,
+  onRestoreHomeSnapshot,
   onTogglePriceFields,
   onViewChange,
   showPriceFields,
@@ -32,11 +36,13 @@ export function ControlsPanel({
         categories={categories}
         draftCategory={draftCategory}
         draftName={draftName}
+        draftQuantityCount={draftQuantityCount}
         guessedCategory={guessedCategory}
         newCategory={newCategory}
         onAddItem={onAddItem}
         onDraftCategoryChange={onDraftCategoryChange}
         onDraftNameChange={onDraftNameChange}
+        onDraftQuantityCountChange={onDraftQuantityCountChange}
         onNewCategoryChange={onNewCategoryChange}
       />
 
@@ -46,7 +52,7 @@ export function ControlsPanel({
 
       <div className="secondary-actions">
         <button className="secondary-action danger" type="button" onClick={onClearCompleted}>
-          <span className="button-icon" aria-hidden="true">⊠</span>
+          <span className="button-icon" aria-hidden="true">🗑</span>
           <span>Καθάρισε όσα έχω</span>
         </button>
         <button
@@ -64,6 +70,51 @@ export function ControlsPanel({
         </button>
       </div>
 
+      <HomeSnapshots snapshots={homeSnapshots} onRestoreSnapshot={onRestoreHomeSnapshot} />
     </aside>
+  );
+}
+
+function formatSnapshotDate(value) {
+  try {
+    return new Intl.DateTimeFormat("el-GR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return "Άγνωστη ώρα";
+  }
+}
+
+function getSnapshotTotalQuantity(snapshot) {
+  return (snapshot.items ?? []).reduce((total, item) => total + (Number.isFinite(item.quantityCount) ? item.quantityCount : 1), 0);
+}
+
+function HomeSnapshots({ onRestoreSnapshot, snapshots }) {
+  const visibleSnapshots = snapshots.slice(0, 3);
+
+  return (
+    <section className="home-snapshots" aria-label="Καταγραφές σπιτιού">
+      <div className="section-label">Καταγραφές σπιτιού</div>
+      {visibleSnapshots.length === 0 ? (
+        <p>Δεν υπάρχει ακόμα αποθηκευμένο reset σπιτιού.</p>
+      ) : (
+        <ol>
+          {visibleSnapshots.map((snapshot) => (
+            <li key={snapshot.id}>
+              <div className="home-snapshot-summary">
+                <strong>{formatSnapshotDate(snapshot.createdAt)}</strong>
+                <span>
+                  {(snapshot.items ?? []).length} προϊόντα · {getSnapshotTotalQuantity(snapshot)} τεμ.
+                </span>
+              </div>
+              <button className="home-snapshot-restore" type="button" onClick={() => onRestoreSnapshot(snapshot)}>
+                Επαναφορά
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }
