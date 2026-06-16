@@ -11,7 +11,7 @@
   --primary: #2f7d32;
   --primary-strong: #0f631b;
   --primary-soft: #edf7e9;
-  --accent: #ffbf00;
+  --accent: #829d07;
   --accent-soft: #fff0d8;
   --danger: #ba1a1a;
   --danger-soft: #ffdad6;
@@ -40,6 +40,11 @@ input,
 select {
   font: inherit;
 }
+
+select#category-select {
+    font-weight: normal;
+}
+
 
 button {
   cursor: pointer;
@@ -197,8 +202,8 @@ h1 {
   flex: 1 1 0;
   gap: 7px;
   justify-content: center;
-  min-height: 36px;
-  padding: 6px 10px;
+  min-height: 44px;
+  padding: 8px 10px;
   text-align: center;
   white-space: nowrap;
 }
@@ -214,7 +219,8 @@ h1 {
   align-self: center;
   line-height: 1.15;
   margin: 0;
-  min-height: 44px;
+  min-height: 50px;
+  padding: 8px 12px;
 }
 
 .stat-card span {
@@ -991,10 +997,12 @@ button:focus-visible {
   align-items: center;
   background: var(--surface);
   border-color: var(--border-strong);
+  border-radius: 4px;
   color: var(--primary-strong);
   display: inline-flex;
   font-size: 1rem;
   justify-content: center;
+  height: 30px;
   min-height: 30px;
   padding: 0;
   width: 30px;
@@ -1005,15 +1013,20 @@ button:focus-visible {
 }
 
 .category-count {
+  align-items: center;
   background: var(--accent-soft);
   border: 1px solid #f4d28e;
   border-radius: 4px;
   color: #6e5100;
+  display: inline-flex;
   font-size: 0.76rem;
   font-weight: 800;
-  min-width: 30px;
-  padding: 3px 8px;
-  text-align: center;
+  height: 30px;
+  justify-content: center;
+  line-height: 1;
+  min-width: 0;
+  padding: 0;
+  width: 30px;
 }
 
 .item-stack {
@@ -1855,6 +1868,22 @@ button:focus-visible {
     display: grid;
   }
 
+  .cart-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+  }
+
+  .cart-back-button,
+  .cart-price-toggle,
+  .cart-finish-button {
+    width: 100%;
+  }
+
+  .cart-finish-button {
+    grid-column: 1 / -1;
+  }
+
   .cart-summary {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1880,8 +1909,8 @@ button:focus-visible {
 
   .stat-card,
   .stats .shopping-nav-button {
-    min-height: 38px;
-    padding: 7px 8px;
+    min-height: 44px;
+    padding: 9px 8px;
   }
 
   .stat-card {
@@ -1894,7 +1923,7 @@ button:focus-visible {
 
   .stats .shopping-nav-button {
     justify-self: stretch;
-    min-height: 42px;
+    min-height: 48px;
   }
 
   .stats strong {
