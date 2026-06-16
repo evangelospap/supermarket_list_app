@@ -13,6 +13,7 @@ import { buildInitialState, isValidState, normalizeState } from "./utils/state";
 import { getQuantityNote, normalizeQuantityCount } from "./utils/quantity";
 
 const PRICE_FIELDS_STORAGE_KEY = "supermarket-show-price-fields";
+const ONBOARDING_DISMISSED_STORAGE_KEY = "supermarket-onboarding-dismissed";
 const MAX_HOME_SNAPSHOTS = 20;
 
 const VIEW_LABELS = {
@@ -33,6 +34,22 @@ function readStoredPriceFieldsVisibility() {
 function writeStoredPriceFieldsVisibility(isVisible) {
   try {
     globalThis.localStorage?.setItem(PRICE_FIELDS_STORAGE_KEY, String(isVisible));
+  } catch {
+    // Local UI preference only; ignore unavailable storage.
+  }
+}
+
+function readStoredOnboardingDismissed() {
+  try {
+    return globalThis.localStorage?.getItem(ONBOARDING_DISMISSED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeStoredOnboardingDismissed() {
+  try {
+    globalThis.localStorage?.setItem(ONBOARDING_DISMISSED_STORAGE_KEY, "true");
   } catch {
     // Local UI preference only; ignore unavailable storage.
   }
@@ -415,6 +432,7 @@ function App() {
   const [pendingDuplicate, setPendingDuplicate] = useState(null);
   const [pendingVoiceItems, setPendingVoiceItems] = useState([]);
   const [showPriceFields, setShowPriceFields] = useState(readStoredPriceFieldsVisibility);
+  const [isOnboardingDismissed, setIsOnboardingDismissed] = useState(readStoredOnboardingDismissed);
   const [statusNotices, setStatusNotices] = useState([]);
   const didFinishInitialLoad = useRef(false);
   const productsSectionRef = useRef(null);
@@ -807,6 +825,11 @@ function App() {
     });
   }
 
+  function dismissOnboarding() {
+    setIsOnboardingDismissed(true);
+    writeStoredOnboardingDismissed();
+  }
+
   function scrollToProductsOnMobile() {
     if (!globalThis.matchMedia?.("(max-width: 920px)").matches) {
       return;
@@ -1002,6 +1025,25 @@ function App() {
   return (
     <main className="app-shell">
       <DashboardHeader totals={totals} view={view} onOpenCart={openShoppingCart} onViewChange={changeViewFromNavigation} />
+
+      {!isOnboardingDismissed ? (
+        <section className="onboarding-hint" aria-label="Σύντομη βοήθεια για τη λίστα">
+          <div>
+            <p className="onboarding-kicker">Για αρχή</p>
+            <p>
+              <strong>Χρειάζομαι</strong> είναι η λίστα αγοράς. Όταν τσεκάρεις προϊόν από εκεί, μεταφέρεται στο{" "}
+              <strong>Έχω σπίτι</strong> και μπορείς να το αναιρέσεις αμέσως.
+            </p>
+            <p>
+              Το <strong>Πάμε σούπερ</strong> ανοίγει μόνο τα προϊόντα που χρειάζεσαι για τα ψώνια. Όσα δεν θες τώρα τα βάζεις στο{" "}
+              <strong>Δεν το θέλω</strong>.
+            </p>
+          </div>
+          <button type="button" onClick={dismissOnboarding}>
+            Το κατάλαβα
+          </button>
+        </section>
+      ) : null}
 
       <section className="workspace">
         <ControlsPanel
