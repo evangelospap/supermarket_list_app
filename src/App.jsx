@@ -415,7 +415,7 @@ function App() {
   const [pendingDuplicate, setPendingDuplicate] = useState(null);
   const [pendingVoiceItems, setPendingVoiceItems] = useState([]);
   const [showPriceFields, setShowPriceFields] = useState(readStoredPriceFieldsVisibility);
-  const [statusNotice, setStatusNotice] = useState(null);
+  const [statusNotices, setStatusNotices] = useState([]);
   const didFinishInitialLoad = useRef(false);
   const productsSectionRef = useRef(null);
 
@@ -480,16 +480,16 @@ function App() {
   }, [state, storageReady]);
 
   useEffect(() => {
-    if (!statusNotice) {
+    if (statusNotices.length === 0) {
       return undefined;
     }
 
     const timeoutId = globalThis.setTimeout(() => {
-      setStatusNotice((current) => (current?.id === statusNotice.id ? null : current));
-    }, 5200);
+      setStatusNotices([]);
+    }, 8500);
 
     return () => globalThis.clearTimeout(timeoutId);
-  }, [statusNotice]);
+  }, [statusNotices]);
 
   useEffect(() => {
     if (!storageReady || page !== "cart" || cartItemIds.length > 0) {
@@ -745,21 +745,26 @@ function App() {
     setState((current) => mergeBoughtItemIntoStock(current, itemId));
 
     if (shouldExplainMove) {
-      setStatusNotice({
-        id: `${itemId}-${Date.now()}`,
-        itemName: itemBeforeChange.name,
-        previousState: state,
-      });
+      setStatusNotices((current) => [
+        ...current,
+        {
+          id: `${itemId}-${Date.now()}`,
+          itemName: itemBeforeChange.name,
+          previousState: state,
+        },
+      ]);
     }
   }
 
   function undoStatusNotice() {
-    if (!statusNotice?.previousState) {
+    const latestNotice = statusNotices[statusNotices.length - 1];
+
+    if (!latestNotice?.previousState) {
       return;
     }
 
-    setState(statusNotice.previousState);
-    setStatusNotice(null);
+    setState(latestNotice.previousState);
+    setStatusNotices((current) => current.slice(0, -1));
   }
 
   function toggleNotNeededStatus(itemId) {
@@ -1093,13 +1098,20 @@ function App() {
           }
         }}
       />
-      {statusNotice ? (
+      {statusNotices.length > 0 ? (
         <div className="status-feedback" role="status">
-          <span>
-            <strong>{statusNotice.itemName}</strong> πήγε στο Έχω σπίτι.
-          </span>
+          {statusNotices.length === 1 ? (
+            <span>
+              <strong>{statusNotices[0].itemName}</strong> πήγε στο Έχω σπίτι.
+            </span>
+          ) : (
+            <span>
+              <strong>{statusNotices.length} προϊόντα</strong> πήγαν στο Έχω σπίτι.
+              <small> Μπορείς να κάνεις αναίρεση ένα-ένα.</small>
+            </span>
+          )}
           <button type="button" onClick={undoStatusNotice}>
-            Αναίρεση
+            {statusNotices.length === 1 ? "Αναίρεση" : "Αναίρεση τελευταίου"}
           </button>
         </div>
       ) : null}
