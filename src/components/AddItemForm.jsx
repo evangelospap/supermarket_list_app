@@ -2,66 +2,61 @@ export function AddItemForm({
   categories,
   draftCategory,
   draftName,
-  draftQuantityCount,
   guessedCategory,
   newCategory,
   onAddItem,
   onDraftCategoryChange,
   onDraftNameChange,
-  onDraftQuantityCountChange,
   onNewCategoryChange,
 }) {
   return (
     <form className="add-form" onSubmit={onAddItem}>
-      <label htmlFor="item-name">Πρόσθεσε προϊόν</label>
-      <div className="input-row">
+      <div className="panel-section-header">
+        <span className="section-label">Πρόσθεσε προϊόν</span>
+      </div>
+
+      <label className="field-shell" htmlFor="item-name">
+        <span>Προϊόν</span>
         <input
           id="item-name"
           value={draftName}
           onChange={(event) => onDraftNameChange(event.target.value)}
           placeholder="π.χ. γιαούρτι, ρύζι, χαρτί κουζίνας"
         />
-        <button type="submit">Προσθήκη</button>
-      </div>
+      </label>
 
-      <label htmlFor="category-select">Κατηγορία</label>
-      <select
-        id="category-select"
-        value={draftCategory}
-        onChange={(event) => onDraftCategoryChange(event.target.value)}
-      >
-        <option value="auto">Έξυπνη επιλογή: {guessedCategory}</option>
-        {categories.map((category) => (
-          <option key={category} value={category}>
-            {category}
-          </option>
-        ))}
-      </select>
+      <label className="field-shell" htmlFor="category-select">
+        <span>Κατηγορία</span>
+        <select
+          id="category-select"
+          value={draftCategory}
+          onChange={(event) => onDraftCategoryChange(event.target.value)}
+        >
+          <option value="auto">Έξυπνη επιλογή: {guessedCategory}</option>
+          {categories.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </select>
+      </label>
 
-      {/* <label htmlFor="item-quantity">Ποσότητα για αγορά</label>
-      <input
-        id="item-quantity"
-        inputMode="numeric"
-        min="1"
-        pattern="[0-9]*"
-        type="text"
-        value={draftQuantityCount}
-        onBlur={(event) => {
-          if (!event.target.value.trim()) {
-            onDraftQuantityCountChange("1");
-          }
-        }}
-        onChange={(event) => onDraftQuantityCountChange(event.target.value.replace(/\D/g, ""))}
-        placeholder="1"
-      /> */}
+      <label className="field-shell" htmlFor="new-category">
+        <span>Νέα κατηγορία</span>
+        <input
+          id="new-category"
+          value={newCategory}
+          onChange={(event) => onNewCategoryChange(event.target.value)}
+          placeholder="π.χ. BBQ, Μωρό, Γιορτή"
+        />
+      </label>
 
-      <label htmlFor="new-category">Ή νέα κατηγορία</label>
-      <input
-        id="new-category"
-        value={newCategory}
-        onChange={(event) => onNewCategoryChange(event.target.value)}
-        placeholder="π.χ. BBQ, Μωρό, Γιορτή"
-      />
+      <button className="add-submit-button" type="submit">
+        <span className="submit-plus-icon" aria-hidden="true">
+          +
+        </span>
+        Προσθήκη
+      </button>
     </form>
   );
 }

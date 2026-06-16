@@ -31,16 +31,16 @@ export function ShoppingCartPage({
           <p className="dashboard-note">Τσέκαρε κάθε προϊόν όταν το βάλεις στο καλάθι. Οι επιλογές σώζονται στη λίστα σου.</p>
         </div>
         <div className="cart-actions">
-          <button
+          <button className="cart-back-button" type="button" onClick={onBack}>
+            {`<`} Πάμε πίσω
+          </button>
+           <button
             aria-pressed={showPriceFields}
             className={`cart-price-toggle ${showPriceFields ? "active" : ""}`}
             type="button"
             onClick={onTogglePriceFields}
           >
-            Τιμές
-          </button>
-          <button className="cart-back-button" type="button" onClick={onBack}>
-            Πάμε πίσω
+            Δείξε Τιμές
           </button>
           <button className="cart-finish-button" type="button" onClick={onFinishShopping}>
             Τέλος αγορών
@@ -57,14 +57,18 @@ export function ShoppingCartPage({
           <small>Τα πήρα</small>
           <strong>{takenCount}</strong>
         </span>
-        <span>
-          <small>Σύνολο διαδρομής</small>
-          <strong>{items.length}</strong>
-        </span>
-        <span>
-          <small>Εκτίμηση</small>
-          <strong>{formatEuroAmount(estimatedTotal)}</strong>
-        </span>
+
+          <span>
+            <small>Σύνολο διαδρομής</small>
+            <strong>{items.length}</strong>
+          </span>
+        {showPriceFields ?
+          <span>
+            <small>Εκτίμηση</small>
+            <strong>{formatEuroAmount(estimatedTotal)}</strong>
+          </span>
+        : null
+        }
       </section>
 
       <section className="cart-list" aria-label="Checklist προϊόντων">

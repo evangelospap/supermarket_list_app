@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { suggestCategory } from "../utils/categories";
 
+function MicrophoneIcon() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path d="M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3Z" />
+      <path d="M5 11a7 7 0 0 0 14 0" />
+      <path d="M12 18v3" />
+      <path d="M9 21h6" />
+    </svg>
+  );
+}
+
 function getSpeechRecognition() {
   if (typeof window === "undefined") {
     return null;
@@ -150,8 +161,11 @@ export function VoiceAddPanel({ categories, onAddVoiceItems }) {
     <section className="voice-panel" aria-label="Φωνητική προσθήκη">
       <div className="section-label">Βρες το με Φωνή</div>
       <div className="voice-actions">
-        <button type="button" onClick={isListening ? stopListening : startListening}>
-          {isListening ? "Σταμάτα" : "Πες προϊόντα"}
+        <button className={`tool-tile voice-trigger ${isListening ? "active" : ""}`} type="button" onClick={isListening ? stopListening : startListening}>
+          <span className="tool-icon">
+            <MicrophoneIcon />
+          </span>
+          <span>{isListening ? "Σταμάτα" : "Φωνή"}</span>
         </button>
         {stagedItems.length > 0 ? (
           <button className="voice-clear" type="button" onClick={() => setStagedItems([])}>

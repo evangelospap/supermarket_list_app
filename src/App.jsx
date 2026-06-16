@@ -15,6 +15,13 @@ import { getQuantityNote, normalizeQuantityCount } from "./utils/quantity";
 const PRICE_FIELDS_STORAGE_KEY = "supermarket-show-price-fields";
 const MAX_HOME_SNAPSHOTS = 20;
 
+const VIEW_LABELS = {
+  all: "Όλα",
+  have: "Έχω σπίτι",
+  needed: "Χρειάζομαι",
+  notNeeded: "Δεν το χρειάζομαι",
+};
+
 function readStoredPriceFieldsVisibility() {
   try {
     return globalThis.localStorage?.getItem(PRICE_FIELDS_STORAGE_KEY) === "true";
@@ -272,10 +279,26 @@ function restoreHomeSnapshot(current, snapshotId) {
 
   const snapshotItems = snapshot.items ?? [];
   const restoredSnapshotIndexes = new Set();
+  const restoredItemSnapshotIndexes = new Map();
+
+  current.items
+    .filter((item) => item.status === "have")
+    .forEach((item) => {
+      const snapshotIndex = snapshotItems.findIndex(
+        (snapshotItem, index) => !restoredSnapshotIndexes.has(index) && getProductMatchType(item, snapshotItem),
+      );
+
+      if (snapshotIndex !== -1) {
+        restoredSnapshotIndexes.add(snapshotIndex);
+        restoredItemSnapshotIndexes.set(item.id, snapshotIndex);
+      }
+    });
 
   const itemsWithRestoredHave = current.items.reduce((nextItems, item) => {
-    if (item.status !== "have") {
-      return [...nextItems, item];
+    const assignedSnapshotIndex = restoredItemSnapshotIndexes.get(item.id);
+
+    if (assignedSnapshotIndex !== undefined) {
+      return [...nextItems, createRestoredHaveItem(snapshotItems[assignedSnapshotIndex], item)];
     }
 
     const snapshotIndex = snapshotItems.findIndex(
@@ -283,6 +306,18 @@ function restoreHomeSnapshot(current, snapshotId) {
     );
 
     if (snapshotIndex === -1) {
+      const matchesRestoredSnapshot = snapshotItems.some(
+        (snapshotItem, index) => restoredSnapshotIndexes.has(index) && getProductMatchType(item, snapshotItem),
+      );
+
+      if (matchesRestoredSnapshot) {
+        return nextItems;
+      }
+
+      if (item.status !== "have") {
+        return [...nextItems, item];
+      }
+
       return addNeededItemMerging(nextItems, { ...item, status: "needed" });
     }
 
@@ -301,6 +336,14 @@ function restoreHomeSnapshot(current, snapshotId) {
     categories: [...new Set([...current.categories, ...snapshotCategories])],
     items: [...missingRestoredItems, ...itemsWithRestoredHave],
   };
+}
+
+function itemMatchesView(item, view) {
+  return view === "all" || item.status === view;
+}
+
+function hasResettableQuantity(item) {
+  return normalizeQuantityCount(item.quantityCount) > 1 || Boolean(getQuantityNote(item).trim());
 }
 
 function increaseDuplicateQuantityInState(current, pendingDuplicate) {
@@ -367,10 +410,12 @@ function App() {
   const [pendingDeleteItem, setPendingDeleteItem] = useState(null);
   const [pendingClearCompleted, setPendingClearCompleted] = useState(false);
   const [pendingResetList, setPendingResetList] = useState(false);
+  const [pendingResetQuantities, setPendingResetQuantities] = useState(false);
   const [pendingRestoreSnapshot, setPendingRestoreSnapshot] = useState(null);
   const [pendingDuplicate, setPendingDuplicate] = useState(null);
   const [pendingVoiceItems, setPendingVoiceItems] = useState([]);
   const [showPriceFields, setShowPriceFields] = useState(readStoredPriceFieldsVisibility);
+  const [statusNotice, setStatusNotice] = useState(null);
   const didFinishInitialLoad = useRef(false);
   const productsSectionRef = useRef(null);
 
@@ -435,6 +480,18 @@ function App() {
   }, [state, storageReady]);
 
   useEffect(() => {
+    if (!statusNotice) {
+      return undefined;
+    }
+
+    const timeoutId = globalThis.setTimeout(() => {
+      setStatusNotice((current) => (current?.id === statusNotice.id ? null : current));
+    }, 5200);
+
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [statusNotice]);
+
+  useEffect(() => {
     if (!storageReady || page !== "cart" || cartItemIds.length > 0) {
       return;
     }
@@ -494,6 +551,10 @@ function App() {
       { all: 0, needed: 0, notNeeded: 0, have: 0 },
     );
   }, [state.items]);
+
+  const resettableQuantityCount = useMemo(() => {
+    return state.items.filter((item) => itemMatchesView(item, view) && hasResettableQuantity(item)).length;
+  }, [state.items, view]);
 
   const cartItems = useMemo(() => {
     const cartIdSet = new Set(cartItemIds);
@@ -678,7 +739,27 @@ function App() {
   }
 
   function toggleItemStatus(itemId) {
+    const itemBeforeChange = state.items.find((item) => item.id === itemId);
+    const shouldExplainMove = page !== "cart" && view === "needed" && itemBeforeChange?.status === "needed";
+
     setState((current) => mergeBoughtItemIntoStock(current, itemId));
+
+    if (shouldExplainMove) {
+      setStatusNotice({
+        id: `${itemId}-${Date.now()}`,
+        itemName: itemBeforeChange.name,
+        previousState: state,
+      });
+    }
+  }
+
+  function undoStatusNotice() {
+    if (!statusNotice?.previousState) {
+      return;
+    }
+
+    setState(statusNotice.previousState);
+    setStatusNotice(null);
   }
 
   function toggleNotNeededStatus(itemId) {
@@ -783,6 +864,23 @@ function App() {
     setPendingDeleteItem(null);
     setPendingClearCompleted(false);
     setPendingResetList(false);
+    setPendingResetQuantities(false);
+    setPendingRestoreSnapshot(null);
+    setPendingDuplicate(null);
+    setPendingVoiceItems([]);
+  }
+
+  function resetQuantitiesForCurrentView() {
+    setState((current) => ({
+      ...current,
+      items: current.items.map((item) =>
+        itemMatchesView(item, view) ? { ...item, quantityCount: 1, quantityNote: "" } : item,
+      ),
+    }));
+    setPendingDeleteItem(null);
+    setPendingClearCompleted(false);
+    setPendingResetList(false);
+    setPendingResetQuantities(false);
     setPendingRestoreSnapshot(null);
     setPendingDuplicate(null);
     setPendingVoiceItems([]);
@@ -800,9 +898,19 @@ function App() {
     setPendingDeleteItem(null);
     setPendingClearCompleted(false);
     setPendingResetList(false);
+    setPendingResetQuantities(false);
     setPendingRestoreSnapshot(null);
     setPendingDuplicate(null);
     setPendingVoiceItems([]);
+  }
+
+  function deleteHomeSnapshot(snapshotId) {
+    setState((current) => ({
+      ...current,
+      homeSnapshots: (current.homeSnapshots ?? []).filter((snapshot) => snapshot.id !== snapshotId),
+    }));
+
+    setPendingRestoreSnapshot((current) => (current?.id === snapshotId ? null : current));
   }
 
   const resetHaveItemsConfirmAction = {
@@ -816,6 +924,13 @@ function App() {
 
   const pendingConfirmAction = pendingResetList
     ? resetHaveItemsConfirmAction
+    : pendingResetQuantities
+    ? {
+        confirmLabel: "Reset ποσότητες",
+        eyebrow: "Επιβεβαίωση reset",
+        message: `Θέλεις να γυρίσουν σε 1 οι ποσότητες για το φίλτρο "${VIEW_LABELS[view] ?? view}"; Θα καθαριστούν και οι σημειώσεις ποσότητας για ${resettableQuantityCount} προϊόντα. Δεν αλλάζουν status, τιμές ή barcodes.`,
+        title: "Reset ποσοτήτων;",
+      }
     : pendingRestoreSnapshot
     ? {
         confirmClassName: "modal-primary",
@@ -904,6 +1019,8 @@ function App() {
           onNewCategoryChange={setNewCategory}
           onQueryChange={setQuery}
           onResetList={() => setPendingResetList(true)}
+          onResetQuantities={() => setPendingResetQuantities(true)}
+          onDeleteHomeSnapshot={deleteHomeSnapshot}
           onRestoreHomeSnapshot={setPendingRestoreSnapshot}
           onTogglePriceFields={togglePriceFields}
           onViewChange={changeViewFromNavigation}
@@ -936,6 +1053,7 @@ function App() {
           setPendingDeleteItem(null);
           setPendingClearCompleted(false);
           setPendingResetList(false);
+          setPendingResetQuantities(false);
           setPendingRestoreSnapshot(null);
         }}
         onConfirm={() => {
@@ -960,6 +1078,11 @@ function App() {
             return;
           }
 
+          if (pendingResetQuantities) {
+            resetQuantitiesForCurrentView();
+            return;
+          }
+
           if (pendingRestoreSnapshot) {
             restoreSnapshot();
           }
@@ -970,6 +1093,16 @@ function App() {
           }
         }}
       />
+      {statusNotice ? (
+        <div className="status-feedback" role="status">
+          <span>
+            <strong>{statusNotice.itemName}</strong> πήγε στο Έχω σπίτι.
+          </span>
+          <button type="button" onClick={undoStatusNotice}>
+            Αναίρεση
+          </button>
+        </div>
+      ) : null}
       <ScrollTopButton />
     </main>
   );

@@ -3,6 +3,21 @@ import { lookupProductCode } from "../storage";
 import { normalizeScannedCode, SCANNER_FORMATS } from "../utils/scanner";
 import { suggestCategory } from "../utils/categories";
 
+function ScannerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path d="M5 7V5h4" />
+      <path d="M15 5h4v2" />
+      <path d="M19 17v2h-4" />
+      <path d="M9 19H5v-2" />
+      <path d="M7 9v6" />
+      <path d="M10 9v6" />
+      <path d="M14 9v6" />
+      <path d="M17 9v6" />
+    </svg>
+  );
+}
+
 export function ProductScanner({ categories, onAddScannedItem }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -160,9 +175,11 @@ export function ProductScanner({ categories, onAddScannedItem }) {
     <section className="scanner-panel" aria-label="Scanner προϊόντος">
       <div className="section-label">Scan για προσθήκη</div>
       {/* <label>Στάδιο 1: αναγνώριση προϊόντος</label> */}
-      <button className="scanner-button" type="button" onClick={() => setCameraOpen((current) => !current)}>
-        <span className="button-icon" aria-hidden="true">▣</span>
-        <span>{cameraOpen ? "Κλείσιμο κάμερας" : "Scan barcode"}</span>
+      <button className={`tool-tile scanner-button ${cameraOpen ? "active" : ""}`} type="button" onClick={() => setCameraOpen((current) => !current)}>
+        <span className="tool-icon">
+          <ScannerIcon />
+        </span>
+        <span>{cameraOpen ? "Κλείσιμο" : "Scanner"}</span>
       </button>
 
       {cameraOpen ? (

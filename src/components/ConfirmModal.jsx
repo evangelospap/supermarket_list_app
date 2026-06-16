@@ -4,7 +4,7 @@ export function ConfirmModal({ action, onCancel, onConfirm, onSecondary }) {
   }
 
   const confirmClassName = action.confirmClassName ?? "modal-danger";
-  const secondaryLabel = action.secondaryLabel ?? action.cancelLabel ?? "Cancel";
+  const secondaryLabel = action.secondaryLabel ?? action.cancelLabel ?? "Άκυρο";
   const handleSecondary = action.secondaryLabel && onSecondary ? onSecondary : onCancel;
 
   return (

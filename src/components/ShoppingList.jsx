@@ -1,9 +1,64 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getCategoryIcon } from "../utils/categories";
 import { formatEuroAmount, getEstimatedLineTotal, parseEstimatedPrice } from "../utils/price";
-import { getQuantitySummary, hasCustomQuantity, normalizeQuantityCount } from "../utils/quantity";
+import { getQuantityNote, normalizeQuantityCount } from "../utils/quantity";
 
-function QuantityEditor({ item, onUpdateItemQuantityCount, onUpdateItemQuantityNote }) {
+const COLLAPSED_CATEGORIES_STORAGE_KEY = "supermarket-collapsed-categories";
+
+function isMobileViewport() {
+  try {
+    return globalThis.matchMedia?.("(max-width: 620px)")?.matches ?? false;
+  } catch {
+    return false;
+  }
+}
+
+function readCollapsedCategories(categoryNames = []) {
+  if (isMobileViewport()) {
+    return new Set(categoryNames);
+  }
+
+  try {
+    return new Set(JSON.parse(globalThis.localStorage?.getItem(COLLAPSED_CATEGORIES_STORAGE_KEY) ?? "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeCollapsedCategories(categories) {
+  try {
+    globalThis.localStorage?.setItem(COLLAPSED_CATEGORIES_STORAGE_KEY, JSON.stringify([...categories]));
+  } catch {
+    // Local UI preference only; ignore unavailable storage.
+  }
+}
+
+function getCategoryPanelId(category) {
+  return `category-panel-${encodeURIComponent(category)}`;
+}
+
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z" />
+      <path d="m14 6 4 4" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path d="M4 7h16" />
+      <path d="M9 7V4h6v3" />
+      <path d="m6 7 1 13h10l1-13" />
+      <path d="M10 11v5" />
+      <path d="M14 11v5" />
+    </svg>
+  );
+}
+
+function QuantityStepper({ item, onUpdateItemQuantityCount }) {
   const quantityCount = normalizeQuantityCount(item.quantityCount);
   const [quantityDraft, setQuantityDraft] = useState(String(quantityCount));
 
@@ -11,65 +66,46 @@ function QuantityEditor({ item, onUpdateItemQuantityCount, onUpdateItemQuantityN
     setQuantityDraft(String(quantityCount));
   }, [quantityCount]);
 
-  return (
-    <div className="quantity-field" aria-label={`Ποσότητα για ${item.name}`}>
-      <span>Ποσ.</span>
-      <div className="quantity-controls">
-        <button
-          aria-label={`Μείωση ποσότητας για ${item.name}`}
-          className="quantity-stepper"
-          disabled={quantityCount <= 1}
-          type="button"
-          onClick={() => {
-            const nextCount = Math.max(1, quantityCount - 1);
-            setQuantityDraft(String(nextCount));
-            onUpdateItemQuantityCount(item.id, nextCount);
-          }}
-        >
-          -
-        </button>
-        <input
-          aria-label={`Αριθμός τεμαχίων για ${item.name}`}
-          inputMode="numeric"
-          min="1"
-          pattern="[0-9]*"
-          type="text"
-          value={quantityDraft}
-          onBlur={(event) => {
-            if (!event.target.value.trim()) {
-              setQuantityDraft("1");
-              onUpdateItemQuantityCount(item.id, 1);
-            }
-          }}
-          onChange={(event) => {
-            const nextValue = event.target.value.replace(/\D/g, "");
-            setQuantityDraft(nextValue);
+  function updateQuantity(nextCount) {
+    const normalizedCount = normalizeQuantityCount(nextCount);
+    setQuantityDraft(String(normalizedCount));
+    onUpdateItemQuantityCount(item.id, normalizedCount);
+  }
 
-            if (nextValue) {
-              onUpdateItemQuantityCount(item.id, Number(nextValue));
-            }
-          }}
-        />
-        <button
-          aria-label={`Αύξηση ποσότητας για ${item.name}`}
-          className="quantity-stepper"
-          type="button"
-          onClick={() => {
-            const nextCount = quantityCount + 1;
-            setQuantityDraft(String(nextCount));
-            onUpdateItemQuantityCount(item.id, nextCount);
-          }}
-        >
-          +
-        </button>
-        <input
-          aria-label={`Σημείωση ποσότητας για ${item.name}`}
-          className="quantity-note"
-          value={item.quantityNote ?? ""}
-          onChange={(event) => onUpdateItemQuantityNote(item.id, event.target.value)}
-          placeholder="500γρ"
-        />
-      </div>
+  return (
+    <div className="row-quantity-stepper" aria-label={`Ποσότητα για ${item.name}`}>
+      <button
+        aria-label={`Μείωση ποσότητας για ${item.name}`}
+        disabled={quantityCount <= 1}
+        type="button"
+        onClick={() => updateQuantity(quantityCount - 1)}
+      >
+        −
+      </button>
+      <input
+        aria-label={`Αριθμός τεμαχίων για ${item.name}`}
+        inputMode="numeric"
+        min="1"
+        pattern="[0-9]*"
+        type="text"
+        value={quantityDraft}
+        onBlur={(event) => {
+          if (!event.target.value.trim()) {
+            updateQuantity(1);
+          }
+        }}
+        onChange={(event) => {
+          const nextValue = event.target.value.replace(/\D/g, "");
+          setQuantityDraft(nextValue);
+
+          if (nextValue) {
+            onUpdateItemQuantityCount(item.id, Number(nextValue));
+          }
+        }}
+      />
+      <button aria-label={`Αύξηση ποσότητας για ${item.name}`} type="button" onClick={() => updateQuantity(quantityCount + 1)}>
+        +
+      </button>
     </div>
   );
 }
@@ -92,6 +128,51 @@ function PriceEditor({ item, onUpdateItemEstimatedPrice }) {
   );
 }
 
+function ItemEditPanel({
+  item,
+  onToggleItemStatus,
+  onToggleNotNeededStatus,
+  onUpdateItemEstimatedPrice,
+  onUpdateItemQuantityNote,
+  showPriceFields,
+}) {
+  return (
+    <div className={`item-detail-fields ${showPriceFields ? "with-prices" : "without-prices"}`}>
+      <div className="item-status-tools">
+        <button
+          aria-pressed={item.status === "have"}
+          className={`have-toggle ${item.status === "have" ? "active" : ""}`}
+          type="button"
+          onClick={() => onToggleItemStatus(item.id)}
+        >
+          Το 'χω!
+        </button>
+        <button
+          aria-pressed={item.status === "notNeeded"}
+          className={`not-needed-toggle ${item.status === "notNeeded" ? "active" : ""}`}
+          type="button"
+          onClick={() => onToggleNotNeededStatus(item.id)}
+        >
+          Δεν θέλω
+        </button>
+      </div>
+
+      <label className="quantity-note-field">
+        <span>Qt.</span>
+        <input
+          aria-label={`Σημείωση ποσότητας για ${item.name}`}
+          className="quantity-note"
+          value={item.quantityNote ?? ""}
+          onChange={(event) => onUpdateItemQuantityNote(item.id, event.target.value)}
+          placeholder="π.χ. 500γρ"
+        />
+      </label>
+
+      {showPriceFields ? <PriceEditor item={item} onUpdateItemEstimatedPrice={onUpdateItemEstimatedPrice} /> : null}
+    </div>
+  );
+}
+
 function ItemRow({
   item,
   onRequestRemoveItem,
@@ -102,60 +183,66 @@ function ItemRow({
   onUpdateItemQuantityNote,
   showPriceFields,
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const quantityNote = getQuantityNote(item).trim();
+
   return (
-    <div className={`item-row ${item.status}`}>
+    <div className={`item-row ${item.status} ${isEditing ? "editing" : ""}`}>
       <div className="item-check">
+        <input
+          aria-label={`${item.status === "have" ? "Αφαίρεση από Έχω σπίτι" : "Σήμανση ως Έχω σπίτι"}: ${item.name}`}
+          checked={item.status === "have"}
+          onChange={() => onToggleItemStatus(item.id)}
+          type="checkbox"
+        />
         <span className="item-name">
           <strong>{item.name}</strong>
-          {hasCustomQuantity(item) ? <span className="quantity-summary">{getQuantitySummary(item)}</span> : null}
-        </span>
-        <span className="item-actions">
-          <span className="have-toggle">
-            <input
-              aria-label={`${item.status === "have" ? "Αφαίρεση από Έχω σπίτι" : "Σήμανση ως Έχω σπίτι"}: ${item.name}`}
-              checked={item.status === "have"}
-              onChange={() => onToggleItemStatus(item.id)}
-              type="checkbox"
-            />
-            <span>Το 'χω!</span>
-          </span>
-          <button
-            aria-pressed={item.status === "notNeeded"}
-            className={`not-needed-toggle ${item.status === "notNeeded" ? "active" : ""}`}
-            type="button"
-            onClick={() => onToggleNotNeededStatus(item.id)}
-          >
-            Δεν θέλω
-          </button>
+          {quantityNote ? <span className="quantity-summary">{quantityNote}</span> : null}
         </span>
       </div>
 
-      <div className={`item-detail-fields ${showPriceFields ? "with-prices" : "without-prices"}`}>
-        <QuantityEditor
+      <div className="row-tools">
+        <QuantityStepper item={item} onUpdateItemQuantityCount={onUpdateItemQuantityCount} />
+        <button
+          aria-expanded={isEditing}
+          aria-label={`Επεξεργασία ${item.name}`}
+          className="icon-row-button edit-row-button"
+          type="button"
+          onClick={() => setIsEditing((current) => !current)}
+        >
+          <EditIcon />
+        </button>
+        <button
+          aria-label={`Διαγραφή ${item.name}`}
+          className="icon-row-button delete-row-button"
+          type="button"
+          onClick={() => onRequestRemoveItem(item)}
+        >
+          <TrashIcon />
+        </button>
+      </div>
+
+      {isEditing ? (
+        <ItemEditPanel
           item={item}
-          onUpdateItemQuantityCount={onUpdateItemQuantityCount}
+          onToggleItemStatus={onToggleItemStatus}
+          onToggleNotNeededStatus={onToggleNotNeededStatus}
+          onUpdateItemEstimatedPrice={onUpdateItemEstimatedPrice}
           onUpdateItemQuantityNote={onUpdateItemQuantityNote}
+          showPriceFields={showPriceFields}
         />
-        {showPriceFields ? <PriceEditor item={item} onUpdateItemEstimatedPrice={onUpdateItemEstimatedPrice} /> : null}
-      </div>
-
-      <button
-        aria-label={`Διαγραφή ${item.name}`}
-        className="delete-button"
-        type="button"
-        onClick={() => onRequestRemoveItem(item)}
-      >
-        ×
-      </button>
+      ) : null}
     </div>
   );
 }
 
 function CategoryCard({
   group,
+  isCollapsed,
   quickAddCategory,
   quickAddName,
   onAddItemToCategory,
+  onToggleCategoryCollapsed,
   onQuickAddNameChange,
   onRequestRemoveItem,
   onToggleItemStatus,
@@ -166,58 +253,77 @@ function CategoryCard({
   onUpdateItemQuantityNote,
   showPriceFields,
 }) {
+  const categoryPanelId = getCategoryPanelId(group.category);
+
   return (
-    <article className="category-card">
+    <article className={`category-card ${isCollapsed ? "collapsed" : ""}`}>
       <header>
-        <div className="category-title">
-          <h2>
+        <button
+          aria-controls={categoryPanelId}
+          aria-expanded={!isCollapsed}
+          className="category-heading-button"
+          type="button"
+          onClick={() => onToggleCategoryCollapsed(group.category)}
+        >
+          <span className={`category-chevron ${isCollapsed ? "" : "open"}`} aria-hidden="true">
+            ›
+          </span>
+          <span className="category-title">
             <span className="category-icon" aria-hidden="true">
               {getCategoryIcon(group.category)}
             </span>
-            <span>{group.category}</span>
-          </h2>
-        </div>
+            <span className="category-name">{group.category}</span>
+          </span>
+        </button>
         <div className="category-actions">
           <button
             aria-label={`Προσθήκη προϊόντος στην κατηγορία ${group.category}`}
             className="quick-add-toggle"
             type="button"
-            onClick={() => onToggleQuickAdd(group.category)}
+            onClick={() => {
+              if (isCollapsed) {
+                onToggleCategoryCollapsed(group.category);
+              }
+
+              onToggleQuickAdd(group.category);
+            }}
           >
             +
           </button>
-          <span>{group.items.length}</span>
+          <span className="category-count">{group.items.length}</span>
         </div>
       </header>
 
-      <div className="item-stack">
-        {quickAddCategory === group.category ? (
-          <form className="quick-add-form" onSubmit={(event) => onAddItemToCategory(event, group.category)}>
-            <input
-              autoFocus
-              aria-label={`Νέο προϊόν για ${group.category}`}
-              value={quickAddName}
-              onChange={(event) => onQuickAddNameChange(event.target.value)}
-              placeholder="Νέο προϊόν"
-            />
-            <button type="submit">+</button>
-          </form>
-        ) : null}
+      {!isCollapsed ? (
+        <div className="item-stack" id={categoryPanelId}>
+          {quickAddCategory === group.category ? (
+            <form className="quick-add-form" onSubmit={(event) => onAddItemToCategory(event, group.category)}>
+              <input
+                autoFocus
+                aria-label={`Νέο προϊόν για ${group.category}`}
+                value={quickAddName}
+                onChange={(event) => onQuickAddNameChange(event.target.value)}
+                placeholder="Νέο προϊόν"
+              />
+              <button type="submit">+</button>
+            </form>
+          ) : null}
 
-        {group.items.map((item) => (
-          <ItemRow
-            item={item}
-            key={item.id}
-            onRequestRemoveItem={onRequestRemoveItem}
-            onToggleItemStatus={onToggleItemStatus}
-            onToggleNotNeededStatus={onToggleNotNeededStatus}
-            onUpdateItemEstimatedPrice={onUpdateItemEstimatedPrice}
-            onUpdateItemQuantityCount={onUpdateItemQuantityCount}
-            onUpdateItemQuantityNote={onUpdateItemQuantityNote}
-            showPriceFields={showPriceFields}
-          />
-        ))}
-      </div>
+          {group.items.map((item) => (
+            <ItemRow
+              item={item}
+              key={item.id}
+              onRequestRemoveItem={onRequestRemoveItem}
+              onToggleItemStatus={onToggleItemStatus}
+              onToggleNotNeededStatus={onToggleNotNeededStatus}
+              onUpdateItemEstimatedPrice={onUpdateItemEstimatedPrice}
+              onUpdateItemQuantityCount={onUpdateItemQuantityCount}
+              onUpdateItemQuantityNote={onUpdateItemQuantityNote}
+              showPriceFields={showPriceFields}
+            />
+          ))}
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -238,6 +344,35 @@ export function ShoppingList({
   onUpdateItemQuantityNote,
   showPriceFields,
 }) {
+  const categoryNames = itemsByCategory.map((group) => group.category);
+  const categoryKey = categoryNames.join("|");
+  const didApplyMobileDefault = useRef(categoryNames.length > 0);
+  const [collapsedCategories, setCollapsedCategories] = useState(() => readCollapsedCategories(categoryNames));
+
+  useEffect(() => {
+    if (didApplyMobileDefault.current || !isMobileViewport() || categoryNames.length === 0) {
+      return;
+    }
+
+    didApplyMobileDefault.current = true;
+    setCollapsedCategories(new Set(categoryNames));
+  }, [categoryKey, categoryNames]);
+
+  function toggleCategoryCollapsed(category) {
+    setCollapsedCategories((current) => {
+      const next = new Set(current);
+
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+
+      writeCollapsedCategories(next);
+      return next;
+    });
+  }
+
   if (itemsByCategory.length === 0) {
     return (
       <section className="list-area" ref={productsSectionRef} aria-label="Λίστα προϊόντων">
@@ -254,10 +389,12 @@ export function ShoppingList({
       {itemsByCategory.map((group) => (
         <CategoryCard
           group={group}
+          isCollapsed={collapsedCategories.has(group.category)}
           key={group.category}
           quickAddCategory={quickAddCategory}
           quickAddName={quickAddName}
           onAddItemToCategory={onAddItemToCategory}
+          onToggleCategoryCollapsed={toggleCategoryCollapsed}
           onQuickAddNameChange={onQuickAddNameChange}
           onRequestRemoveItem={onRequestRemoveItem}
           onToggleItemStatus={onToggleItemStatus}
