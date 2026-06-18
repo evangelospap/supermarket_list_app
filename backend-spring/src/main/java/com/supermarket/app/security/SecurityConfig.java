@@ -50,7 +50,7 @@ public class SecurityConfig {
   public SecurityFilterChain securityFilterChain(
       HttpSecurity http,
       ObjectProvider<ClientRegistrationRepository> clients,
-      AuthenticationSuccessHandler googleSuccessHandler) throws Exception {
+      AuthenticationSuccessHandler googleSuccessHandler) {
     http
         .csrf(AbstractHttpConfigurer::disable)
         .cors(Customizer.withDefaults())

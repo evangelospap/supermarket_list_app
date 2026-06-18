@@ -14,10 +14,15 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 @Testcontainers(disabledWithoutDocker = true)
 class FlywayMigrationTest {
   @Container
-  static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17")
-      .withDatabaseName("supermarket")
-      .withUsername("supermarket")
-      .withPassword("supermarket");
+  static final PostgreSQLContainer<?> postgres = createPostgresContainer();
+
+  @SuppressWarnings("resource")
+  private static PostgreSQLContainer<?> createPostgresContainer() {
+    return new PostgreSQLContainer<>("postgres:17")
+        .withDatabaseName("supermarket")
+        .withUsername("supermarket")
+        .withPassword("supermarket");
+  }
 
   @Test
   void migrationCreatesHouseholdBackendTables() {
