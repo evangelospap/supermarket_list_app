@@ -1,0 +1,36 @@
+server:
+  port: ${PORT:8787}
+
+spring:
+  application:
+    name: supermarket-household-backend
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:54329/supermarket}
+    username: ${DATABASE_USERNAME:supermarket}
+    password: ${DATABASE_PASSWORD:supermarket}
+  flyway:
+    enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+app:
+  frontend-dist: ${FRONTEND_DIST:../dist}
+  legacy-state-file: ${LEGACY_STATE_FILE:../data/supermarket-state.json}
+  import-legacy-state: ${IMPORT_LEGACY_STATE:false}
+  jwt-secret: ${JWT_SECRET:dev-supermarket-secret-change-me-dev-supermarket-secret}
+  access-token-ttl: PT1H
+  refresh-token-ttl: P30D
+  cookie-secure: ${COOKIE_SECURE:false}
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://localhost:5174
+      - http://127.0.0.1:5173
+      - http://127.0.0.1:5174
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

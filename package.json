@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "dev:all": "node scripts/dev-all.js",
-    "dev:backend": "node backend/server.js",
+    "dev:backend": "cd backend-spring && mvn spring-boot:run",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node backend/server.js"
+    "start": "cd backend-spring && mvn spring-boot:run"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",
