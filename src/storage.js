@@ -10,6 +10,10 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 let accessToken = "";
 
+export function apiUrl(path) {
+  return `${API_BASE_URL}${path}`;
+}
+
 function householdStateKey(householdId) {
   return `household:${householdId}`;
 }
@@ -40,7 +44,7 @@ function authHeaders(headers = {}) {
 }
 
 async function apiFetch(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(apiUrl(path), {
     credentials: "include",
     ...options,
     headers: authHeaders(options.headers ?? {}),
@@ -233,7 +237,7 @@ export async function loadStoredState(householdId) {
     const payload = await apiFetch(`/api/households/${encodeURIComponent(householdId)}/state`);
     const storedPayload = normalizeStoredPayload({ state: payload.state, updatedAt: payload.updatedAt });
     await cachePayload(householdId, storedPayload);
-    return { source: "backend", state: storedPayload.state, updatedAt: storedPayload.updatedAt };
+    return { source: "backend", state: storedPayload.state, updatedAt: storedPayload.updatedAt, version: payload.version };
   } catch {
     let indexedState;
 
@@ -273,7 +277,7 @@ export async function fetchActivity(householdId) {
 }
 
 export async function lookupProductCode(code) {
-  const response = await fetch(`${API_BASE_URL}/api/products/${encodeURIComponent(code)}`, {
+  const response = await fetch(apiUrl(`/api/products/${encodeURIComponent(code)}`), {
     credentials: "include",
     headers: { Accept: "application/json" },
   });

@@ -34,14 +34,6 @@ IMPORT_LEGACY_STATE=false
 LEGACY_STATE_FILE=../data/supermarket-state.json
 ```
 
-Important: Spring Boot does not automatically read `.env` when launched through Maven. Before running backend commands in a terminal, export the file:
-
-```bash
-set -a
-source .env
-set +a
-```
-
 Use a real random `JWT_SECRET` before testing on any shared network. Keep `.env` uncommitted.
 
 ## Database Setup
@@ -81,10 +73,6 @@ docker compose up -d postgres
 
 From the project root:
 
-```bash
-set -a
-source .env
-set +a
 cd backend-spring
 mvn spring-boot:run
 ```
@@ -113,10 +101,6 @@ docker compose up -d postgres
 
 Terminal 2:
 
-```bash
-set -a
-source .env
-set +a
 npm run dev:all
 ```
 
@@ -139,9 +123,6 @@ Use this to test the same-origin mode where Spring serves the Vite `dist/` build
 ```bash
 docker compose up -d postgres
 npm run build
-set -a
-source .env
-set +a
 npm start
 ```
 
@@ -162,9 +143,6 @@ In this mode, Spring serves:
 To import the old JSON file into a default household once:
 
 ```bash
-set -a
-source .env
-set +a
 IMPORT_LEGACY_STATE=true npm start
 ```
 
@@ -181,11 +159,20 @@ IMPORT_LEGACY_STATE=false
 For Google login, create OAuth credentials in Google Cloud and set:
 
 ```bash
-SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID=your-client-id
-SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
 ```
 
-For local development, the Google OAuth redirect URI should be:
+In Google Cloud, configure the OAuth 2.0 Web application client with these local values:
+
+Authorized JavaScript origins:
+
+```text
+http://localhost:8787
+http://localhost:5173
+```
+
+Authorized redirect URIs:
 
 ```text
 http://localhost:8787/login/oauth2/code/google

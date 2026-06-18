@@ -39,3 +39,11 @@ export function navigateToHash(hash) {
 
   window.location.hash = hash;
 }
+
+export function clearAuthCallbackRoute() {
+  if (window.location.pathname !== "/auth/callback") {
+    return;
+  }
+
+  window.history.replaceState({}, "", `/${window.location.hash || ""}`);
+}

@@ -7,6 +7,7 @@ import { ShoppingCartPage } from "./components/ShoppingCartPage";
 import { ShoppingList } from "./components/ShoppingList";
 import {
   createHousehold,
+  apiUrl,
   fetchActivity,
   getActiveHouseholdId,
   joinGuestHousehold,
@@ -19,7 +20,7 @@ import {
   setActiveHouseholdId,
 } from "./storage";
 import { normalizeText, suggestCategory } from "./utils/categories";
-import { getRouteFromHash, getViewFromHash, navigateToHash, readCartSessionIds, writeCartSessionIds } from "./utils/routes";
+import { clearAuthCallbackRoute, getRouteFromHash, getViewFromHash, navigateToHash, readCartSessionIds, writeCartSessionIds } from "./utils/routes";
 import { normalizeScannedCode } from "./utils/scanner";
 import { buildInitialState, isValidState, normalizeState } from "./utils/state";
 import { getQuantityNote, normalizeQuantityCount } from "./utils/quantity";
@@ -98,7 +99,7 @@ function AuthGate({ error, notice, onGuestJoin }) {
           </button>
         </form>
 
-        <a className="google-login-button" href="/oauth2/authorization/google">
+        <a className="google-login-button" href={apiUrl("/oauth2/authorization/google")}>
           Συνέχεια με Google
         </a>
 
@@ -691,12 +692,14 @@ function App() {
       .then((payload) => {
         if (isMounted) {
           applyAuthPayload(payload);
+          clearAuthCallbackRoute();
         }
       })
       .catch(() => {
         if (isMounted) {
           setAuthReady(true);
           setStorageReady(true);
+          clearAuthCallbackRoute();
         }
       });
 
@@ -721,7 +724,26 @@ function App() {
         }
 
         if (isValidState(storedResult?.state)) {
-          setState(normalizeState(storedResult.state));
+          const normalizedState = normalizeState(storedResult.state);
+          const shouldSeedStarterState =
+            storedResult.source === "backend" &&
+            storedResult.version === 1 &&
+            normalizedState.items.length === 0;
+
+          if (shouldSeedStarterState) {
+            const starterState = buildInitialState();
+            setState(starterState);
+            saveStoredState(activeHouseholdId, starterState, "Αρχικοποίηση λίστας με starter προϊόντα")
+              .then(() => fetchActivity(activeHouseholdId))
+              .then((entries) => {
+                if (isMounted) {
+                  setActivityEntries(entries);
+                }
+              })
+              .catch(() => {});
+          } else {
+            setState(normalizedState);
+          }
         } else {
           setState(buildInitialState());
         }

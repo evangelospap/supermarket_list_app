@@ -13,6 +13,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -31,6 +33,7 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
  */
 @Configuration
 public class SecurityConfig {
+  private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
   private final AppProperties properties;
 
   SecurityConfig(AppProperties properties) {
@@ -61,7 +64,12 @@ public class SecurityConfig {
         .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()));
 
     if (clients.getIfAvailable() != null) {
-      http.oauth2Login(oauth -> oauth.successHandler(googleSuccessHandler));
+      http.oauth2Login(oauth -> oauth
+          .successHandler(googleSuccessHandler)
+          .failureHandler((request, response, exception) -> {
+            log.error("Google OAuth callback failed", exception);
+            response.sendRedirect("/auth/callback?error=oauth_callback");
+          }));
     }
 
     return http.build();
@@ -101,9 +109,14 @@ public class SecurityConfig {
         return;
       }
 
-      AuthTokens tokens = authService.loginGoogle(oidcUser, userAgent(request));
-      addRefreshCookie(response, tokens.refreshToken(), properties);
-      response.sendRedirect("/auth/callback");
+      try {
+        AuthTokens tokens = authService.loginGoogle(oidcUser, userAgent(request));
+        addRefreshCookie(response, tokens.refreshToken(), properties);
+        response.sendRedirect("/auth/callback");
+      } catch (Exception error) {
+        log.error("Google OAuth login succeeded, but local session creation failed", error);
+        response.sendRedirect("/auth/callback?error=oauth_session");
+      }
     };
   }
 
