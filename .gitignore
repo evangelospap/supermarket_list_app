@@ -5,3 +5,4 @@ dist
 /data
 certs
 backend-spring/target
+client_secret_*.json

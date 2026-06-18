@@ -4,14 +4,14 @@ services:
     container_name: supermarket-postgres
     environment:
       POSTGRES_DB: supermarket
-      POSTGRES_USER: supermarket
-      POSTGRES_PASSWORD: supermarket
+      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
     ports:
       - "54329:5432"
     volumes:
       - supermarket-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U supermarket -d supermarket"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10

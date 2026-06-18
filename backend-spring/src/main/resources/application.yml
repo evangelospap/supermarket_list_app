@@ -2,12 +2,16 @@ server:
   port: ${PORT:8787}
 
 spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
   application:
     name: supermarket-household-backend
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:54329/supermarket}
-    username: ${DATABASE_USERNAME:supermarket}
-    password: ${DATABASE_PASSWORD:supermarket}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
   flyway:
     enabled: true
   jpa:
