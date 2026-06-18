@@ -1,12 +1,18 @@
-// Storage priority: backend JSON DB first, then IndexedDB, then localStorage as the last fallback.
+// Spring backend storage: household state is loaded from the API, with a read-only browser cache per household.
 import { normalizeState } from "./utils/state";
 
 const DB_NAME = "supermarket-list-db";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "app-state";
-const STATE_KEY = "current";
 const LEGACY_STORAGE_KEY = "supermarket-list-state-v1";
+const ACTIVE_HOUSEHOLD_KEY = "supermarket-active-household-id";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+
+let accessToken = "";
+
+function householdStateKey(householdId) {
+  return `household:${householdId}`;
+}
 
 function buildStoredPayload(state, updatedAt = new Date().toISOString()) {
   return { state: normalizeState(state), updatedAt };
@@ -24,60 +30,38 @@ function normalizeStoredPayload(payload) {
   return buildStoredPayload(payload, "");
 }
 
-function isNewerPayload(candidate, current) {
-  if (!candidate) {
-    return false;
-  }
-
-  if (!current) {
-    return true;
-  }
-
-  return String(candidate.updatedAt ?? "") > String(current.updatedAt ?? "");
+function authHeaders(headers = {}) {
+  return accessToken
+    ? {
+        ...headers,
+        Authorization: `Bearer ${accessToken}`,
+      }
+    : headers;
 }
 
-// Backend state is the source of truth when the app is used from multiple devices/browsers.
-async function readFromBackend() {
-  const response = await fetch(`${API_BASE_URL}/api/state`, {
-    headers: { Accept: "application/json" },
+async function apiFetch(path, options = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
+    ...options,
+    headers: authHeaders(options.headers ?? {}),
   });
 
-  if (response.status === 404) {
-    return undefined;
+  if (response.status === 401 && path !== "/api/auth/refresh") {
+    await refreshSession();
+    return apiFetch(path, options);
   }
 
   if (!response.ok) {
-    throw new Error("Could not load backend state");
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || "API request failed");
   }
 
-  const payload = await response.json();
-  return normalizeStoredPayload(payload);
+  return response.status === 204 ? undefined : response.json();
 }
 
-// Every list change is sent as a full state document to keep the API simple.
-async function writeToBackend(payload) {
-  const normalizedPayload = normalizeStoredPayload(payload);
-  const response = await fetch(`${API_BASE_URL}/api/state`, {
-    body: JSON.stringify(normalizedPayload),
-    headers: { "Content-Type": "application/json" },
-    method: "PUT",
-  });
-
-  if (!response.ok) {
-    throw new Error("Could not save backend state");
-  }
-
-  return normalizeStoredPayload(await response.json());
-}
-
-function canUseIndexedDb() {
-  return typeof indexedDB !== "undefined";
-}
-
-// IndexedDB gives us a durable browser cache when the backend is temporarily unavailable.
 function openDatabase() {
   return new Promise((resolve, reject) => {
-    if (!canUseIndexedDb()) {
+    if (typeof indexedDB === "undefined") {
       reject(new Error("IndexedDB is not available"));
       return;
     }
@@ -97,13 +81,13 @@ function openDatabase() {
   });
 }
 
-function readFromIndexedDb() {
+function readFromIndexedDb(key) {
   return new Promise((resolve, reject) => {
     openDatabase()
       .then((db) => {
         const transaction = db.transaction(STORE_NAME, "readonly");
         const store = transaction.objectStore(STORE_NAME);
-        const request = store.get(STATE_KEY);
+        const request = store.get(key);
 
         request.onsuccess = () => resolve(normalizeStoredPayload(request.result));
         request.onerror = () => reject(request.error);
@@ -117,13 +101,13 @@ function readFromIndexedDb() {
   });
 }
 
-function writeToIndexedDb(payload) {
+function writeToIndexedDb(key, payload) {
   return new Promise((resolve, reject) => {
     openDatabase()
       .then((db) => {
         const transaction = db.transaction(STORE_NAME, "readwrite");
         const store = transaction.objectStore(STORE_NAME);
-        const request = store.put(payload, STATE_KEY);
+        const request = store.put(payload, key);
 
         request.onsuccess = () => resolve();
         request.onerror = () => reject(request.error);
@@ -137,103 +121,160 @@ function writeToIndexedDb(payload) {
   });
 }
 
-// localStorage is kept for old saved data and as a tiny emergency fallback.
-function readFromLocalStorage() {
+function readLocalCache(householdId) {
   try {
-    const stored = localStorage.getItem(LEGACY_STORAGE_KEY);
-    return stored ? normalizeStoredPayload(JSON.parse(stored)) : undefined;
+    const key = householdStateKey(householdId);
+    const cached = localStorage.getItem(key) || localStorage.getItem(LEGACY_STORAGE_KEY);
+    return cached ? normalizeStoredPayload(JSON.parse(cached)) : undefined;
   } catch {
     return undefined;
   }
 }
 
-function writeToLocalStorage(payload) {
-  localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(payload));
-}
-
-async function readFromBrowserCache() {
-  let indexedState;
-
+function writeLocalCache(householdId, payload) {
   try {
-    indexedState = await readFromIndexedDb();
+    localStorage.setItem(householdStateKey(householdId), JSON.stringify(payload));
   } catch {
-    // localStorage is the last fallback below.
+    // Cache only; failed writes should not block the app.
   }
-
-  const localState = readFromLocalStorage();
-
-  if (isNewerPayload(localState, indexedState)) {
-    return { source: "localstorage", payload: localState };
-  }
-
-  return { source: indexedState ? "indexeddb" : localState ? "localstorage" : "empty", payload: indexedState ?? localState };
 }
 
-// Load order also migrates older local data up to the backend whenever possible.
-export async function loadStoredState() {
+async function cachePayload(householdId, payload) {
+  writeLocalCache(householdId, payload);
+
   try {
-    const backendPayload = await readFromBackend();
-    const browserResult = await readFromBrowserCache();
-    const browserPayload = browserResult.payload;
+    await writeToIndexedDb(householdStateKey(householdId), payload);
+  } catch {
+    // localStorage cache is enough as a fallback.
+  }
+}
 
-    if (isNewerPayload(browserPayload, backendPayload)) {
-      await writeToBackend(browserPayload);
-      return { source: browserResult.source, state: browserPayload.state };
-    }
+export function getActiveHouseholdId() {
+  try {
+    return localStorage.getItem(ACTIVE_HOUSEHOLD_KEY) || "";
+  } catch {
+    return "";
+  }
+}
 
-    if (backendPayload) {
-      await writeToIndexedDb(backendPayload);
-      writeToLocalStorage(backendPayload);
-      return { source: "backend", state: backendPayload.state };
+export function setActiveHouseholdId(householdId) {
+  try {
+    if (householdId) {
+      localStorage.setItem(ACTIVE_HOUSEHOLD_KEY, householdId);
+    } else {
+      localStorage.removeItem(ACTIVE_HOUSEHOLD_KEY);
     }
   } catch {
-    const browserResult = await readFromBrowserCache();
-    return { source: browserResult.source, state: browserResult.payload?.state };
+    // Local UI preference only.
+  }
+}
+
+export function hasAccessToken() {
+  return Boolean(accessToken);
+}
+
+export async function refreshSession() {
+  const payload = await apiFetch("/api/auth/refresh", { method: "POST" });
+  accessToken = payload.accessToken || accessToken;
+  return payload;
+}
+
+export async function joinGuestHousehold({ deviceLabel, inviteCode }) {
+  const payload = await apiFetch("/api/auth/guest/join", {
+    body: JSON.stringify({ deviceLabel, inviteCode }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+  });
+  accessToken = payload.accessToken || "";
+  return payload;
+}
+
+export async function logoutSession() {
+  try {
+    await apiFetch("/api/auth/logout", { method: "POST" });
+  } finally {
+    accessToken = "";
+    setActiveHouseholdId("");
+  }
+}
+
+export async function loadCurrentUser() {
+  const payload = await apiFetch("/api/me");
+  accessToken = payload.accessToken || accessToken;
+  return payload;
+}
+
+export async function createHousehold(name) {
+  return apiFetch("/api/households", {
+    body: JSON.stringify({ name }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+  });
+}
+
+export async function joinHousehold(inviteCode) {
+  return apiFetch("/api/households/join", {
+    body: JSON.stringify({ inviteCode }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+  });
+}
+
+export async function rotateHouseholdInvite(householdId) {
+  return apiFetch(`/api/households/${encodeURIComponent(householdId)}/invite/rotate`, { method: "POST" });
+}
+
+export async function loadStoredState(householdId) {
+  if (!householdId) {
+    return { source: "empty", state: undefined };
   }
 
   try {
-    const browserResult = await readFromBrowserCache();
-    const browserPayload = browserResult.payload;
+    const payload = await apiFetch(`/api/households/${encodeURIComponent(householdId)}/state`);
+    const storedPayload = normalizeStoredPayload({ state: payload.state, updatedAt: payload.updatedAt });
+    await cachePayload(householdId, storedPayload);
+    return { source: "backend", state: storedPayload.state, updatedAt: storedPayload.updatedAt };
+  } catch {
+    let indexedState;
 
-    if (browserPayload) {
-      const backendPayload = await writeToBackend(browserPayload);
-      await writeToIndexedDb(backendPayload);
-      writeToLocalStorage(backendPayload);
-      return { source: browserResult.source, state: browserPayload.state };
+    try {
+      indexedState = await readFromIndexedDb(householdStateKey(householdId));
+    } catch {
+      // localStorage is the last fallback below.
     }
-  } catch {
-    const browserResult = await readFromBrowserCache();
-    return { source: browserResult.source, state: browserResult.payload?.state };
-  }
 
-  return { source: "empty", state: undefined };
-}
-
-// Save locally first so a quick refresh does not lose the latest checkbox/action.
-export async function saveStoredState(state) {
-  const localPayload = buildStoredPayload(state);
-
-  writeToLocalStorage(localPayload);
-
-  try {
-    await writeToIndexedDb(localPayload);
-  } catch {
-    // localStorage already has the newest copy.
-  }
-
-  try {
-    const backendPayload = await writeToBackend(localPayload);
-    await writeToIndexedDb(backendPayload);
-    writeToLocalStorage(backendPayload);
-    return "backend";
-  } catch {
-    return "localstorage";
+    const localState = readLocalCache(householdId);
+    const payload = indexedState ?? localState;
+    return { source: payload ? "cache" : "empty", state: payload?.state, updatedAt: payload?.updatedAt };
   }
 }
 
-// Scanner lookup is read-only: it identifies a product, then App.jsx decides whether to add it.
+export async function saveStoredState(householdId, state, summary = "Η λίστα ενημερώθηκε") {
+  if (!householdId) {
+    throw new Error("No active household");
+  }
+
+  const payload = await apiFetch(`/api/households/${encodeURIComponent(householdId)}/state`, {
+    body: JSON.stringify({ state: normalizeState(state), summary }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+  });
+  const storedPayload = normalizeStoredPayload({ state: payload.state, updatedAt: payload.updatedAt });
+  await cachePayload(householdId, storedPayload);
+  return { source: "backend", state: storedPayload.state, updatedAt: storedPayload.updatedAt };
+}
+
+export async function fetchActivity(householdId) {
+  if (!householdId) {
+    return [];
+  }
+
+  return apiFetch(`/api/households/${encodeURIComponent(householdId)}/activity?limit=50`);
+}
+
 export async function lookupProductCode(code) {
   const response = await fetch(`${API_BASE_URL}/api/products/${encodeURIComponent(code)}`, {
+    credentials: "include",
     headers: { Accept: "application/json" },
   });
 

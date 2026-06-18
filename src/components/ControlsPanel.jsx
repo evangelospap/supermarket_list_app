@@ -1,9 +1,12 @@
+import { useEffect, useState } from "react";
 import { AddItemForm } from "./AddItemForm";
 import { FilterPanel } from "./FilterPanel";
 import { ProductScanner } from "./ProductScanner";
 import { VoiceAddPanel } from "./VoiceAddPanel";
+import { getCategoryIcon } from "../utils/categories";
 
 export function ControlsPanel({
+  activityEntries = [],
   categories,
   draftCategory,
   draftName,
@@ -20,9 +23,11 @@ export function ControlsPanel({
   onDraftCategoryChange,
   onDraftNameChange,
   onDraftQuantityCountChange,
+  onMoveCategory,
   onNewCategoryChange,
   onQueryChange,
   onDeleteHomeSnapshot,
+  onRenameCategory,
   onResetList,
   onResetQuantities,
   onRestoreHomeSnapshot,
@@ -52,6 +57,8 @@ export function ControlsPanel({
         <VoiceAddPanel categories={categories} onAddVoiceItems={onAddVoiceItems} />
         <ProductScanner categories={categories} onAddScannedItem={onAddScannedItem} />
       </div>
+
+      <CategoryOrderPanel categories={categories} onMoveCategory={onMoveCategory} onRenameCategory={onRenameCategory} />
 
       <div className="secondary-actions">
         <button className="secondary-action danger" type="button" onClick={onClearCompleted}>
@@ -110,7 +117,119 @@ export function ControlsPanel({
         onDeleteSnapshot={onDeleteHomeSnapshot}
         onRestoreSnapshot={onRestoreHomeSnapshot}
       />
+
+      <ActivityFeed entries={activityEntries} />
     </aside>
+  );
+}
+
+function ActivityFeed({ entries }) {
+  const visibleEntries = entries.slice(0, 50);
+
+  return (
+    <section className="activity-feed" aria-label="Πρόσφατη δραστηριότητα">
+      <div className="section-label">Δραστηριότητα</div>
+      {visibleEntries.length === 0 ? (
+        <p>Δεν υπάρχει ακόμα δραστηριότητα.</p>
+      ) : (
+        <ol>
+          {visibleEntries.map((entry) => (
+            <li key={entry.id}>
+              <strong>{entry.actorName}</strong>
+              <span>{entry.summary}</span>
+              <small>{formatActivityTime(entry.occurredAt)}</small>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function formatActivityTime(value) {
+  try {
+    return new Intl.DateTimeFormat("el-GR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return "";
+  }
+}
+
+function CategoryOrderPanel({ categories, onMoveCategory, onRenameCategory }) {
+  return (
+    <section className="category-order-panel" aria-label="Οργάνωση κατηγοριών">
+      <div className="section-label">Κατηγορίες</div>
+      <ol>
+        {categories.map((category, index) => (
+          <CategoryOrderRow
+            category={category}
+            isFirst={index === 0}
+            isLast={index === categories.length - 1}
+            key={category}
+            onMoveCategory={onMoveCategory}
+            onRenameCategory={onRenameCategory}
+          />
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function CategoryOrderRow({ category, isFirst, isLast, onMoveCategory, onRenameCategory }) {
+  const [draftName, setDraftName] = useState(category);
+
+  useEffect(() => {
+    setDraftName(category);
+  }, [category]);
+
+  function commitRename() {
+    const nextName = draftName.trim();
+
+    if (!nextName) {
+      setDraftName(category);
+      return;
+    }
+
+    onRenameCategory(category, nextName);
+  }
+
+  return (
+    <li className="category-order-row">
+      <span className="category-order-icon" aria-hidden="true">
+        {getCategoryIcon(category)}
+      </span>
+      <input
+        aria-label={`Όνομα κατηγορίας ${category}`}
+        value={draftName}
+        onBlur={commitRename}
+        onChange={(event) => setDraftName(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.currentTarget.blur();
+          }
+        }}
+      />
+      <div className="category-order-actions">
+        <button
+          aria-label={`Μετακίνηση ${category} προς τα πάνω`}
+          disabled={isFirst}
+          type="button"
+          onClick={() => onMoveCategory(category, -1)}
+        >
+          ↑
+        </button>
+        <button
+          aria-label={`Μετακίνηση ${category} προς τα κάτω`}
+          disabled={isLast}
+          type="button"
+          onClick={() => onMoveCategory(category, 1)}
+        >
+          ↓
+        </button>
+      </div>
+    </li>
   );
 }
 

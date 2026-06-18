@@ -57,6 +57,10 @@ button {
 }
 
 .hero {
+  align-items: start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
   margin: 0 auto 12px;
   max-width: 1360px;
 }
@@ -98,6 +102,122 @@ h1 {
   color: var(--text-muted);
   font-size: 0.9rem;
   margin: 8px 0 0;
+}
+
+.auth-shell {
+  align-items: center;
+  display: grid;
+  justify-items: center;
+}
+
+.auth-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: grid;
+  gap: 16px;
+  max-width: 520px;
+  padding: 20px;
+  width: min(100%, 520px);
+}
+
+.auth-card,
+.auth-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-card label {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.auth-card button,
+.auth-actions button,
+.google-login-button {
+  align-items: center;
+  background: var(--primary);
+  border: 1px solid var(--primary-strong);
+  border-radius: 4px;
+  color: var(--surface);
+  display: inline-flex;
+  font-weight: 850;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  text-decoration: none;
+}
+
+.auth-actions .secondary-action {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.auth-notice,
+.auth-error {
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  margin: 0;
+  padding: 10px;
+}
+
+.auth-notice {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
+.auth-error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.household-toolbar {
+  align-items: end;
+  display: grid;
+  gap: 7px;
+  justify-items: end;
+  min-width: 280px;
+}
+
+.household-toolbar label {
+  color: var(--text-muted);
+  display: grid;
+  font-size: 0.72rem;
+  font-weight: 800;
+  gap: 4px;
+  width: 100%;
+}
+
+.household-toolbar select {
+  min-height: 34px;
+}
+
+.household-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: end;
+}
+
+.household-actions button {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--primary-strong);
+  font-size: 0.78rem;
+  font-weight: 850;
+  min-height: 30px;
+  padding: 4px 8px;
+}
+
+.household-toolbar small,
+.household-toolbar p {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin: 0;
+  text-align: right;
 }
 
 .shopping-nav-button,
@@ -660,6 +780,118 @@ select:focus {
 .scanner-status,
 .scanner-stage {
   order: 4;
+}
+
+.category-order-panel {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+  padding-top: 14px;
+}
+
+.category-order-panel ol {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  max-height: 330px;
+  overflow: auto;
+  padding: 0 2px 0 0;
+}
+
+.category-order-row {
+  align-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  min-height: 40px;
+  padding: 5px;
+}
+
+.category-order-icon {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: inline-flex;
+  font-size: 0.95rem;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.category-order-row input {
+  background: var(--surface);
+  font-size: 0.78rem;
+  font-weight: 800;
+  min-height: 28px;
+  padding: 4px 7px;
+}
+
+.category-order-actions {
+  display: inline-grid;
+  gap: 3px;
+  grid-template-columns: repeat(2, 26px);
+}
+
+.category-order-actions button {
+  align-items: center;
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--primary-strong);
+  display: inline-flex;
+  font-size: 0.85rem;
+  height: 28px;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0;
+  width: 26px;
+}
+
+.category-order-actions button:hover {
+  background: var(--primary-soft);
+}
+
+.activity-feed {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+  padding-top: 14px;
+}
+
+.activity-feed ol {
+  display: grid;
+  gap: 7px;
+  list-style: none;
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 0;
+}
+
+.activity-feed li {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+}
+
+.activity-feed strong {
+  color: var(--primary-strong);
+  font-size: 0.78rem;
+}
+
+.activity-feed span,
+.activity-feed small,
+.activity-feed p {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  margin: 0;
 }
 
 button:disabled {

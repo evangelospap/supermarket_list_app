@@ -5,14 +5,59 @@ const NAV_ITEMS = [
   { countKey: "all", label: "Όλα", view: "all" },
 ];
 
-export function DashboardHeader({ onOpenCart, onViewChange, totals, view }) {
+export function DashboardHeader({
+  activeHouseholdId,
+  authNotice,
+  households,
+  onCreateHousehold,
+  onJoinHousehold,
+  onLogout,
+  onOpenCart,
+  onRotateInvite,
+  onSwitchHousehold,
+  onViewChange,
+  totals,
+  user,
+  view,
+}) {
+  const activeHousehold = households.find((household) => household.id === activeHouseholdId);
+
   return (
     <>
       <section className="hero">
         <div className="title-block">
           <p className="eyebrow">Supermarket GUI</p>
-          <h2>Λίστα supermarket που ξεχωρίζει τι έχεις και τι χρειάζεσαι.</h2>
+          <h2>{activeHousehold?.name ?? "Λίστα supermarket"}</h2>
           <p className="dashboard-note">Γρήγορη εικόνα αποθέματος, αγορών και σπιτιού.</p>
+        </div>
+
+        <div className="household-toolbar" aria-label="Σπίτια και λογαριασμός">
+          <label>
+            <span>Σπίτι</span>
+            <select value={activeHouseholdId} onChange={(event) => onSwitchHousehold(event.target.value)}>
+              {households.map((household) => (
+                <option key={household.id} value={household.id}>
+                  {household.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="household-actions">
+            <button type="button" onClick={onCreateHousehold}>
+              Νέο
+            </button>
+            <button type="button" onClick={onJoinHousehold}>
+              Join
+            </button>
+            <button type="button" onClick={onRotateInvite}>
+              Κωδικός
+            </button>
+            <button type="button" onClick={onLogout}>
+              Έξοδος
+            </button>
+          </div>
+          <small>{user?.displayName}</small>
+          {authNotice ? <p>{authNotice}</p> : null}
         </div>
       </section>
 

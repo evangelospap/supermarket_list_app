@@ -5,7 +5,19 @@ import { DashboardHeader } from "./components/DashboardHeader";
 import { ScrollTopButton } from "./components/ScrollTopButton";
 import { ShoppingCartPage } from "./components/ShoppingCartPage";
 import { ShoppingList } from "./components/ShoppingList";
-import { loadStoredState, saveStoredState } from "./storage";
+import {
+  createHousehold,
+  fetchActivity,
+  getActiveHouseholdId,
+  joinGuestHousehold,
+  joinHousehold,
+  loadStoredState,
+  logoutSession,
+  refreshSession,
+  rotateHouseholdInvite,
+  saveStoredState,
+  setActiveHouseholdId,
+} from "./storage";
 import { normalizeText, suggestCategory } from "./utils/categories";
 import { getRouteFromHash, getViewFromHash, navigateToHash, readCartSessionIds, writeCartSessionIds } from "./utils/routes";
 import { normalizeScannedCode } from "./utils/scanner";
@@ -53,6 +65,75 @@ function writeStoredOnboardingDismissed() {
   } catch {
     // Local UI preference only; ignore unavailable storage.
   }
+}
+
+function AuthGate({ error, notice, onGuestJoin }) {
+  const [inviteCode, setInviteCode] = useState("");
+
+  function submitInvite(event) {
+    event.preventDefault();
+    onGuestJoin(inviteCode.trim());
+  }
+
+  return (
+    <main className="app-shell auth-shell">
+      <section className="auth-panel" aria-label="Σύνδεση σε σπίτι">
+        <div>
+          <p className="eyebrow">Supermarket GUI</p>
+          <h1>Διάλεξε σπίτι για τη λίστα.</h1>
+          <p className="dashboard-note">Μπες με κωδικό πρόσκλησης ή συνέχισε με Google όταν έχεις ρυθμίσει OAuth credentials.</p>
+        </div>
+
+        <form className="auth-card" onSubmit={submitInvite}>
+          <label htmlFor="invite-code">Κωδικός πρόσκλησης</label>
+          <input
+            id="invite-code"
+            autoComplete="one-time-code"
+            value={inviteCode}
+            onChange={(event) => setInviteCode(event.target.value)}
+            placeholder="π.χ. ABC1234567"
+          />
+          <button type="submit" disabled={!inviteCode.trim()}>
+            Μπες στο σπίτι
+          </button>
+        </form>
+
+        <a className="google-login-button" href="/oauth2/authorization/google">
+          Συνέχεια με Google
+        </a>
+
+        {notice ? <p className="auth-notice">{notice}</p> : null}
+        {error ? <p className="auth-error">{error}</p> : null}
+      </section>
+    </main>
+  );
+}
+
+function EmptyHouseholdState({ error, notice, onCreateHousehold, onJoinHousehold, onLogout }) {
+  return (
+    <main className="app-shell auth-shell">
+      <section className="auth-panel" aria-label="Δεν υπάρχει ενεργό σπίτι">
+        <div>
+          <p className="eyebrow">Supermarket GUI</p>
+          <h1>Δεν έχεις συνδεθεί σε σπίτι ακόμα.</h1>
+          <p className="dashboard-note">Φτιάξε ένα καινούργιο σπίτι ή μπες σε υπάρχον με κωδικό πρόσκλησης.</p>
+        </div>
+        <div className="auth-actions">
+          <button type="button" onClick={onCreateHousehold}>
+            Νέο σπίτι
+          </button>
+          <button type="button" onClick={onJoinHousehold}>
+            Μπες με κωδικό
+          </button>
+          <button className="secondary-action" type="button" onClick={onLogout}>
+            Έξοδος
+          </button>
+        </div>
+        {notice ? <p className="auth-notice">{notice}</p> : null}
+        {error ? <p className="auth-error">{error}</p> : null}
+      </section>
+    </main>
+  );
 }
 
 function createShoppingItem({ barcode, category, estimatedPrice = "", name, quantityCount = 1, quantityNote = "" }) {
@@ -355,6 +436,46 @@ function restoreHomeSnapshot(current, snapshotId) {
   };
 }
 
+function moveCategoryInState(current, category, direction) {
+  const categoryIndex = current.categories.indexOf(category);
+  const targetIndex = categoryIndex + direction;
+
+  if (categoryIndex === -1 || targetIndex < 0 || targetIndex >= current.categories.length) {
+    return current;
+  }
+
+  const categories = [...current.categories];
+  [categories[categoryIndex], categories[targetIndex]] = [categories[targetIndex], categories[categoryIndex]];
+
+  return {
+    ...current,
+    categories,
+  };
+}
+
+function renameCategoryInState(current, category, nextName) {
+  const trimmedName = nextName.trim();
+
+  if (!trimmedName || trimmedName === category) {
+    return current;
+  }
+
+  const categories = current.categories.map((entry) => (entry === category ? trimmedName : entry));
+  const uniqueCategories = categories.filter((entry, index) => categories.indexOf(entry) === index);
+
+  return {
+    ...current,
+    categories: uniqueCategories,
+    items: current.items.map((item) => (item.category === category ? { ...item, category: trimmedName } : item)),
+    learnedProducts: Object.fromEntries(
+      Object.entries(current.learnedProducts ?? {}).map(([code, product]) => [
+        code,
+        product.category === category ? { ...product, category: trimmedName } : product,
+      ]),
+    ),
+  };
+}
+
 function itemMatchesView(item, view) {
   return view === "all" || item.status === view;
 }
@@ -413,6 +534,13 @@ function mergeBoughtItemIntoStock(current, itemId) {
 
 function App() {
   const [state, setState] = useState(buildInitialState);
+  const [authReady, setAuthReady] = useState(false);
+  const [authUser, setAuthUser] = useState(null);
+  const [households, setHouseholds] = useState([]);
+  const [activeHouseholdId, setActiveHouseholdIdState] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
+  const [activityEntries, setActivityEntries] = useState([]);
   const [storageReady, setStorageReady] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftCategory, setDraftCategory] = useState("auto");
@@ -437,6 +565,106 @@ function App() {
   const didFinishInitialLoad = useRef(false);
   const productsSectionRef = useRef(null);
 
+  function applyAuthPayload(payload) {
+    const nextHouseholds = payload?.households ?? [];
+    const storedHouseholdId = getActiveHouseholdId();
+    const activeId =
+      nextHouseholds.find((household) => household.id === storedHouseholdId)?.id ??
+      payload?.activeHouseholdId ??
+      nextHouseholds[0]?.id ??
+      "";
+
+    setAuthUser(payload?.user ?? null);
+    setHouseholds(nextHouseholds);
+    setActiveHouseholdIdState(activeId);
+    setActiveHouseholdId(activeId);
+    setAuthReady(true);
+    return activeId;
+  }
+
+  async function handleGuestJoin(inviteCode) {
+    setAuthError("");
+    setAuthNotice("");
+
+    try {
+      const payload = await joinGuestHousehold({
+        deviceLabel: `Guest ${navigator.userAgent.includes("Chrome") ? "Chrome" : "Device"}`,
+        inviteCode,
+      });
+      applyAuthPayload(payload);
+    } catch {
+      setAuthError("Δεν βρέθηκε σπίτι με αυτόν τον κωδικό.");
+    }
+  }
+
+  async function handleCreateHousehold() {
+    const name = window.prompt("Όνομα σπιτιού", "Το σπίτι μας")?.trim();
+
+    if (!name) {
+      return;
+    }
+
+    try {
+      const result = await createHousehold(name);
+      setAuthNotice(`Νέος κωδικός σπιτιού: ${result.inviteCode}`);
+      const nextHouseholds = [...households.filter((household) => household.id !== result.household.id), result.household];
+      setHouseholds(nextHouseholds);
+      setActiveHouseholdIdState(result.household.id);
+      setActiveHouseholdId(result.household.id);
+    } catch {
+      setAuthError("Δεν μπόρεσα να φτιάξω νέο σπίτι.");
+    }
+  }
+
+  async function handleJoinHousehold() {
+    const inviteCode = window.prompt("Κωδικός πρόσκλησης")?.trim();
+
+    if (!inviteCode) {
+      return;
+    }
+
+    try {
+      const household = await joinHousehold(inviteCode);
+      setAuthNotice(`Μπήκες στο σπίτι: ${household.name}`);
+      const nextHouseholds = [...households.filter((entry) => entry.id !== household.id), household];
+      setHouseholds(nextHouseholds);
+      setActiveHouseholdIdState(household.id);
+      setActiveHouseholdId(household.id);
+    } catch {
+      setAuthError("Ο κωδικός πρόσκλησης δεν είναι σωστός.");
+    }
+  }
+
+  async function handleRotateInvite() {
+    if (!activeHouseholdId) {
+      return;
+    }
+
+    try {
+      const result = await rotateHouseholdInvite(activeHouseholdId);
+      setAuthNotice(`Νέος κωδικός για ${result.household.name}: ${result.inviteCode}`);
+    } catch {
+      setAuthError("Δεν μπόρεσα να αλλάξω τον κωδικό πρόσκλησης.");
+    }
+  }
+
+  async function handleLogout() {
+    await logoutSession();
+    setAuthUser(null);
+    setHouseholds([]);
+    setActiveHouseholdIdState("");
+    setStorageReady(true);
+  }
+
+  function switchHousehold(householdId) {
+    setActiveHouseholdIdState(householdId);
+    setActiveHouseholdId(householdId);
+    setQuery("");
+    setView("all");
+    setCartItemIds([]);
+    writeCartSessionIds([]);
+  }
+
   useEffect(() => {
     function syncRouteFromHash() {
       setPage(getRouteFromHash());
@@ -459,20 +687,15 @@ function App() {
   useEffect(() => {
     let isMounted = true;
 
-    loadStoredState()
-      .then((storedResult) => {
-        if (!isMounted) {
-          return;
+    refreshSession()
+      .then((payload) => {
+        if (isMounted) {
+          applyAuthPayload(payload);
         }
-
-        if (isValidState(storedResult?.state)) {
-          setState(normalizeState(storedResult.state));
-        }
-
-        setStorageReady(true);
       })
       .catch(() => {
         if (isMounted) {
+          setAuthReady(true);
           setStorageReady(true);
         }
       });
@@ -483,7 +706,53 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!storageReady) {
+    if (!authReady || !activeHouseholdId) {
+      return undefined;
+    }
+
+    let isMounted = true;
+    didFinishInitialLoad.current = false;
+    setStorageReady(false);
+
+    loadStoredState(activeHouseholdId)
+      .then((storedResult) => {
+        if (!isMounted) {
+          return;
+        }
+
+        if (isValidState(storedResult?.state)) {
+          setState(normalizeState(storedResult.state));
+        } else {
+          setState(buildInitialState());
+        }
+
+        setStorageReady(true);
+      })
+      .catch(() => {
+        if (isMounted) {
+          setStorageReady(true);
+        }
+      });
+
+    fetchActivity(activeHouseholdId)
+      .then((entries) => {
+        if (isMounted) {
+          setActivityEntries(entries);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setActivityEntries([]);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeHouseholdId, authReady]);
+
+  useEffect(() => {
+    if (!storageReady || !activeHouseholdId) {
       return;
     }
 
@@ -492,10 +761,20 @@ function App() {
       return;
     }
 
-    saveStoredState(state).catch(() => {
-      // The storage layer already falls back locally; no user-blocking action is needed here.
-    });
-  }, [state, storageReady]);
+    saveStoredState(activeHouseholdId, state)
+      .then(() => fetchActivity(activeHouseholdId))
+      .then(setActivityEntries)
+      .catch(() => {
+        setStatusNotices((current) => [
+          ...current,
+          {
+            id: `save-${Date.now()}`,
+            itemName: "Αποθήκευση",
+            previousState: null,
+          },
+        ]);
+      });
+  }, [activeHouseholdId, state, storageReady]);
 
   useEffect(() => {
     if (statusNotices.length === 0) {
@@ -941,6 +1220,16 @@ function App() {
     setPendingRestoreSnapshot((current) => (current?.id === snapshotId ? null : current));
   }
 
+  function moveCategory(category, direction) {
+    setState((current) => moveCategoryInState(current, category, direction));
+  }
+
+  function renameCategory(category, nextName) {
+    setState((current) => renameCategoryInState(current, category, nextName));
+    setDraftCategory((current) => (current === category ? nextName.trim() : current));
+    setQuickAddCategory((current) => (current === category ? nextName.trim() : current));
+  }
+
   const resetHaveItemsConfirmAction = {
     cancelLabel: "Άκυρο",
     confirmLabel: "Reset Έχω σπίτι",
@@ -1008,6 +1297,33 @@ function App() {
         }
       : null;
 
+  if (!authReady) {
+    return (
+      <main className="app-shell auth-shell">
+        <section className="auth-panel" aria-label="Φόρτωση">
+          <p className="eyebrow">Supermarket GUI</p>
+          <h1>Φορτώνω το σπίτι...</h1>
+        </section>
+      </main>
+    );
+  }
+
+  if (!authUser) {
+    return <AuthGate error={authError} notice={authNotice} onGuestJoin={handleGuestJoin} />;
+  }
+
+  if (households.length === 0 || !activeHouseholdId) {
+    return (
+      <EmptyHouseholdState
+        error={authError}
+        notice={authNotice}
+        onCreateHousehold={handleCreateHousehold}
+        onJoinHousehold={handleJoinHousehold}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
   if (page === "cart") {
     return (
       <ShoppingCartPage
@@ -1024,7 +1340,21 @@ function App() {
 
   return (
     <main className="app-shell">
-      <DashboardHeader totals={totals} view={view} onOpenCart={openShoppingCart} onViewChange={changeViewFromNavigation} />
+      <DashboardHeader
+        activeHouseholdId={activeHouseholdId}
+        authNotice={authNotice}
+        households={households}
+        totals={totals}
+        user={authUser}
+        view={view}
+        onCreateHousehold={handleCreateHousehold}
+        onJoinHousehold={handleJoinHousehold}
+        onLogout={handleLogout}
+        onOpenCart={openShoppingCart}
+        onRotateInvite={handleRotateInvite}
+        onSwitchHousehold={switchHousehold}
+        onViewChange={changeViewFromNavigation}
+      />
 
       {!isOnboardingDismissed ? (
         <section className="onboarding-hint" aria-label="Σύντομη βοήθεια για τη λίστα">
@@ -1047,6 +1377,7 @@ function App() {
 
       <section className="workspace">
         <ControlsPanel
+          activityEntries={activityEntries}
           categories={state.categories}
           draftCategory={draftCategory}
           draftName={draftName}
@@ -1065,6 +1396,8 @@ function App() {
           onDraftQuantityCountChange={setDraftQuantityCount}
           onNewCategoryChange={setNewCategory}
           onQueryChange={setQuery}
+          onMoveCategory={moveCategory}
+          onRenameCategory={renameCategory}
           onResetList={() => setPendingResetList(true)}
           onResetQuantities={() => setPendingResetQuantities(true)}
           onDeleteHomeSnapshot={deleteHomeSnapshot}

@@ -63,9 +63,20 @@ function normalizeHomeSnapshot(snapshot) {
   };
 }
 
+function normalizeCategories(value) {
+  const categories = Array.isArray(value?.categories) ? value.categories : [];
+  const itemCategories = Array.isArray(value?.items) ? value.items.map((item) => item?.category) : [];
+
+  return [...categories, ...itemCategories].filter(
+    (category, index, allCategories) =>
+      typeof category === "string" && category.trim() && allCategories.indexOf(category) === index,
+  );
+}
+
 export function normalizeState(value) {
   return {
     ...value,
+    categories: normalizeCategories(value),
     homeSnapshots: Array.isArray(value?.homeSnapshots) ? value.homeSnapshots.map(normalizeHomeSnapshot) : [],
     items: Array.isArray(value?.items) ? value.items.map(normalizeItem) : [],
     learnedProducts: value?.learnedProducts ?? {},
