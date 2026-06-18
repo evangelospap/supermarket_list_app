@@ -47,7 +47,7 @@ public class AuthController {
   @PostMapping("/api/auth/guest/join")
   AuthResponse joinGuest(@Valid @RequestBody JoinInviteRequest request, HttpServletRequest servletRequest, HttpServletResponse response) {
     AuthTokens tokens = authService.joinGuest(request.inviteCode(), request.deviceLabel(), SecurityConfig.userAgent(servletRequest));
-    SecurityConfig.addRefreshCookie(response, tokens.refreshToken(), properties);
+    SecurityConfig.addRefreshCookie(servletRequest, response, tokens.refreshToken(), properties);
     return authService.authResponse(tokens.accessToken(), tokens.userId(), tokens.activeHouseholdId());
   }
 
@@ -55,7 +55,7 @@ public class AuthController {
   AuthResponse refresh(HttpServletRequest request, HttpServletResponse response) {
     String refreshToken = CookieSupport.readCookie(request, "refresh_token").orElseThrow(NotAuthorizedException::new);
     AuthTokens tokens = authService.refresh(refreshToken, SecurityConfig.userAgent(request));
-    SecurityConfig.addRefreshCookie(response, tokens.refreshToken(), properties);
+    SecurityConfig.addRefreshCookie(request, response, tokens.refreshToken(), properties);
     return authService.authResponse(tokens.accessToken(), tokens.userId(), tokens.activeHouseholdId());
   }
 

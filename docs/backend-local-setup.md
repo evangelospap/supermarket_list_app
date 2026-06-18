@@ -129,7 +129,7 @@ npm start
 Open:
 
 ```text
-http://localhost:8787
+https://localhost:8787
 ```
 
 In this mode, Spring serves:
@@ -137,6 +137,19 @@ In this mode, Spring serves:
 - `/` and frontend routes from `dist/`
 - `/api/**` from the backend
 - `/actuator/health` for health
+
+If certificate files exist under `certs/`, Spring serves HTTPS automatically. It prefers:
+
+1. `certs/tailscale-dev.pem` with `certs/tailscale-dev-key.pem`
+2. `certs/local-dev.pem` with `certs/local-dev-key.pem`
+
+When the Tailscale certificate is present, open the app from another device with the Tailscale hostname, for example:
+
+```text
+https://desktop-de1g0tf.tail0276cd.ts.net:8787
+```
+
+If no local certificate pair exists, Spring falls back to plain HTTP on the same port.
 
 ## First Legacy Import
 
@@ -170,12 +183,16 @@ Authorized JavaScript origins:
 ```text
 http://localhost:8787
 http://localhost:5173
+https://localhost:8787
+https://desktop-de1g0tf.tail0276cd.ts.net:8787
 ```
 
 Authorized redirect URIs:
 
 ```text
 http://localhost:8787/login/oauth2/code/google
+https://localhost:8787/login/oauth2/code/google
+https://desktop-de1g0tf.tail0276cd.ts.net:8787/login/oauth2/code/google
 ```
 
 If testing through Vite, Google still returns to Spring on port `8787`, and Spring redirects to:

@@ -111,7 +111,7 @@ public class SecurityConfig {
 
       try {
         AuthTokens tokens = authService.loginGoogle(oidcUser, userAgent(request));
-        addRefreshCookie(response, tokens.refreshToken(), properties);
+        addRefreshCookie(request, response, tokens.refreshToken(), properties);
         response.sendRedirect("/auth/callback");
       } catch (Exception error) {
         log.error("Google OAuth login succeeded, but local session creation failed", error);
@@ -127,10 +127,10 @@ public class SecurityConfig {
    * @param refreshToken opaque refresh token value
    * @param properties cookie security settings
    */
-  public static void addRefreshCookie(HttpServletResponse response, String refreshToken, AppProperties properties) {
+  public static void addRefreshCookie(HttpServletRequest request, HttpServletResponse response, String refreshToken, AppProperties properties) {
     ResponseCookie cookie = ResponseCookie.from("refresh_token", refreshToken)
         .httpOnly(true)
-        .secure(properties.cookieSecure())
+        .secure(properties.cookieSecure() || request.isSecure())
         .sameSite("Lax")
         .path("/")
         .maxAge(properties.refreshTokenTtl())
