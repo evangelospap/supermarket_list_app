@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class MutationService {
+  private static final String PINNED_LAST_CATEGORY = "Να μην ξεχάσω";
+
   private final JdbcClient jdbc;
   private final StateSnapshotService snapshots;
   private final ActivityService activity;
@@ -110,15 +112,18 @@ public class MutationService {
     return snapshots.rebuildSnapshot(householdId);
   }
 
-  /** Moves a category by one position. */
+  /** Moves a category by one position, leaving the reminder category pinned last. */
   @Transactional
   public StoredStateResponse moveCategory(UUID householdId, UUID actorId, String categoryName, int direction) {
+    if (PINNED_LAST_CATEGORY.equals(categoryName)) {
+      return snapshots.readSnapshot(householdId);
+    }
     List<CategoryRow> categories = jdbc.sql("""
         SELECT name, sort_order
         FROM household_categories
         WHERE household_id = ?
-        ORDER BY sort_order
-        """).param(householdId).query((rs, rowNum) -> new CategoryRow(rs.getString("name"), rs.getInt("sort_order"))).list();
+        ORDER BY CASE WHEN name = ? THEN 1 ELSE 0 END, sort_order
+        """).params(householdId, PINNED_LAST_CATEGORY).query((rs, rowNum) -> new CategoryRow(rs.getString("name"), rs.getInt("sort_order"))).list();
     int index = -1;
     for (int i = 0; i < categories.size(); i++) {
       if (categories.get(i).name().equals(categoryName)) {

@@ -2,6 +2,18 @@ import { DEFAULT_CATEGORIES, STARTER_ITEMS } from "../data/catalog";
 import { normalizeEstimatedPrice } from "./price";
 import { getQuantityNote, normalizeQuantityCount } from "./quantity";
 
+const PINNED_LAST_CATEGORY = "Να μην ξεχάσω";
+
+export function orderCategories(categories) {
+  const uniqueCategories = categories.filter(
+    (category, index, allCategories) =>
+      typeof category === "string" && category.trim() && allCategories.indexOf(category) === index,
+  );
+  const regularCategories = uniqueCategories.filter((category) => category !== PINNED_LAST_CATEGORY);
+
+  return uniqueCategories.includes(PINNED_LAST_CATEGORY) ? [...regularCategories, PINNED_LAST_CATEGORY] : regularCategories;
+}
+
 function isValidLearnedProducts(value) {
   return (
     value === undefined ||
@@ -67,10 +79,7 @@ function normalizeCategories(value) {
   const categories = Array.isArray(value?.categories) ? value.categories : [];
   const itemCategories = Array.isArray(value?.items) ? value.items.map((item) => item?.category) : [];
 
-  return [...categories, ...itemCategories].filter(
-    (category, index, allCategories) =>
-      typeof category === "string" && category.trim() && allCategories.indexOf(category) === index,
-  );
+  return orderCategories([...categories, ...itemCategories]);
 }
 
 export function normalizeState(value) {

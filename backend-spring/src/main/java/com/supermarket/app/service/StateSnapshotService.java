@@ -25,10 +25,11 @@ import tools.jackson.databind.node.ObjectNode;
 @Service
 public class StateSnapshotService {
   private static final Logger log = LoggerFactory.getLogger(StateSnapshotService.class);
+  private static final String PINNED_LAST_CATEGORY = "Να μην ξεχάσω";
   private static final List<String> DEFAULT_CATEGORIES = List.of(
-      "Να μην ξεχάσω", "Μαναβική", "Γαλακτοκομικά", "Κρέας / Ψάρια", "Αλλαντικά / Τυριά", "Κατάψυξη",
+      "Μαναβική", "Γαλακτοκομικά", "Κρέας / Ψάρια", "Αλλαντικά / Τυριά", "Κατάψυξη",
       "Ζυμαρικά / Ρύζι", "Κονσέρβες / Σάλτσες", "Πρωινό / Καφέδες", "Σνακ / Γλυκά", "Ποτά",
-      "Καθαριότητα", "Προσωπική φροντίδα", "Χαρτικά");
+      "Καθαριότητα", "Προσωπική φροντίδα", "Χαρτικά", PINNED_LAST_CATEGORY);
 
   private final JdbcClient jdbc;
   private final ObjectMapper objectMapper;
@@ -40,7 +41,7 @@ public class StateSnapshotService {
     this.activity = activity.getIfAvailable();
   }
 
-  /** Ensures a household has the default category set. */
+  /** Ensures a household has the default category set with the reminder category last. */
   public void ensureDefaults(UUID householdId) {
     Integer count = jdbc.sql("SELECT COUNT(*) FROM household_categories WHERE household_id = ?")
         .param(householdId)
@@ -136,8 +137,14 @@ public class StateSnapshotService {
   }
 
   private List<String> categories(UUID householdId) {
-    return jdbc.sql("SELECT name FROM household_categories WHERE household_id = ? ORDER BY sort_order, name")
+    return jdbc.sql("""
+        SELECT name
+        FROM household_categories
+        WHERE household_id = ?
+        ORDER BY CASE WHEN name = ? THEN 1 ELSE 0 END, sort_order, name
+        """)
         .param(householdId)
+        .param(PINNED_LAST_CATEGORY)
         .query(String.class)
         .list();
   }

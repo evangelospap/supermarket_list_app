@@ -1,5 +1,4 @@
 export const DEFAULT_CATEGORIES = [
-  "Να μην ξεχάσω",
   "Μαναβική",
   "Γαλακτοκομικά",
   "Κρέας / Ψάρια",
@@ -13,6 +12,7 @@ export const DEFAULT_CATEGORIES = [
   "Καθαριότητα",
   "Προσωπική φροντίδα",
   "Χαρτικά",
+  "Να μην ξεχάσω",
 ];
 
 export const CATEGORY_ICONS = {

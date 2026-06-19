@@ -22,7 +22,7 @@ import {
 import { normalizeText, suggestCategory } from "./utils/categories";
 import { clearAuthCallbackRoute, getRouteFromHash, getViewFromHash, navigateToHash, readCartSessionIds, writeCartSessionIds } from "./utils/routes";
 import { normalizeScannedCode } from "./utils/scanner";
-import { buildInitialState, isValidState, normalizeState } from "./utils/state";
+import { buildInitialState, isValidState, normalizeState, orderCategories } from "./utils/state";
 import { getQuantityNote, normalizeQuantityCount } from "./utils/quantity";
 
 const PRICE_FIELDS_STORAGE_KEY = "supermarket-show-price-fields";
@@ -432,7 +432,7 @@ function restoreHomeSnapshot(current, snapshotId) {
 
   return {
     ...current,
-    categories: [...new Set([...current.categories, ...snapshotCategories])],
+    categories: orderCategories([...current.categories, ...snapshotCategories]),
     items: [...missingRestoredItems, ...itemsWithRestoredHave],
   };
 }
@@ -450,7 +450,7 @@ function moveCategoryInState(current, category, direction) {
 
   return {
     ...current,
-    categories,
+    categories: orderCategories(categories),
   };
 }
 
@@ -466,7 +466,7 @@ function renameCategoryInState(current, category, nextName) {
 
   return {
     ...current,
-    categories: uniqueCategories,
+    categories: orderCategories(uniqueCategories),
     items: current.items.map((item) => (item.category === category ? { ...item, category: trimmedName } : item)),
     learnedProducts: Object.fromEntries(
       Object.entries(current.learnedProducts ?? {}).map(([code, product]) => [
@@ -531,6 +531,10 @@ function mergeBoughtItemIntoStock(current, itemId) {
       .map((item) => (item.id === existingHaveItem.id ? mergeItemQuantity(item, itemToMarkHave, "have") : item))
       .filter((item) => item.id !== itemId),
   };
+}
+
+function shouldSeedStarterState(storedResult, normalizedState) {
+  return storedResult?.source === "backend" && normalizedState.items.length === 0;
 }
 
 function App() {
@@ -725,12 +729,8 @@ function App() {
 
         if (isValidState(storedResult?.state)) {
           const normalizedState = normalizeState(storedResult.state);
-          const shouldSeedStarterState =
-            storedResult.source === "backend" &&
-            storedResult.version === 1 &&
-            normalizedState.items.length === 0;
 
-          if (shouldSeedStarterState) {
+          if (shouldSeedStarterState(storedResult, normalizedState)) {
             const starterState = buildInitialState();
             setState(starterState);
             saveStoredState(activeHouseholdId, starterState, "Αρχικοποίηση λίστας με starter προϊόντα")
@@ -1343,6 +1343,17 @@ function App() {
         onJoinHousehold={handleJoinHousehold}
         onLogout={handleLogout}
       />
+    );
+  }
+
+  if (!storageReady) {
+    return (
+      <main className="app-shell auth-shell">
+        <section className="auth-panel" aria-label="Φόρτωση λίστας">
+          <p className="eyebrow">Supermarket GUI</p>
+          <h1>Φορτώνω τη λίστα...</h1>
+        </section>
+      </main>
     );
   }
 

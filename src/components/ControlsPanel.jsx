@@ -5,6 +5,8 @@ import { ProductScanner } from "./ProductScanner";
 import { VoiceAddPanel } from "./VoiceAddPanel";
 import { getCategoryIcon } from "../utils/categories";
 
+const PINNED_LAST_CATEGORY = "Να μην ξεχάσω";
+
 export function ControlsPanel({
   activityEntries = [],
   categories,
@@ -179,6 +181,7 @@ function CategoryOrderPanel({ categories, onMoveCategory, onRenameCategory }) {
 
 function CategoryOrderRow({ category, isFirst, isLast, onMoveCategory, onRenameCategory }) {
   const [draftName, setDraftName] = useState(category);
+  const isPinnedLast = category === PINNED_LAST_CATEGORY;
 
   useEffect(() => {
     setDraftName(category);
@@ -214,7 +217,7 @@ function CategoryOrderRow({ category, isFirst, isLast, onMoveCategory, onRenameC
       <div className="category-order-actions">
         <button
           aria-label={`Μετακίνηση ${category} προς τα πάνω`}
-          disabled={isFirst}
+          disabled={isFirst || isPinnedLast}
           type="button"
           onClick={() => onMoveCategory(category, -1)}
         >
@@ -222,7 +225,7 @@ function CategoryOrderRow({ category, isFirst, isLast, onMoveCategory, onRenameC
         </button>
         <button
           aria-label={`Μετακίνηση ${category} προς τα κάτω`}
-          disabled={isLast}
+          disabled={isLast || isPinnedLast}
           type="button"
           onClick={() => onMoveCategory(category, 1)}
         >
