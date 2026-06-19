@@ -19,6 +19,10 @@
   --danger-strong: #ef4444;
   --danger-soft: rgba(147, 0, 10, 0.28);
   --shadow-soft: 0 4px 8px rgba(0, 0, 0, 0.5);
+  --primary-hover: #3b6934;
+  --summary-background: rgba(16, 17, 16, 0.88);
+  --tooltip-background: #0f160f;
+  --checkbox-check: #0a3909;
   --radius-sm: 4px;
   --radius-md: 12px;
   --radius-lg: 16px;
@@ -30,6 +34,32 @@
     sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+}
+
+:root[data-theme="light"] {
+  --background: #fcf9f8;
+  --surface: #ffffff;
+  --surface-muted: #f6f3f2;
+  --surface-raised: #f0eded;
+  --surface-high: #ebe8e7;
+  --border: #d1d1d1;
+  --border-strong: #bfcaba;
+  --text: #1c1b1b;
+  --text-muted: #40493d;
+  --primary: #2f7d32;
+  --primary-strong: #0f631b;
+  --primary-soft: #edf7e9;
+  --accent: #8a5a00;
+  --accent-strong: #6f4600;
+  --accent-soft: #fff0d8;
+  --danger: #ba1a1a;
+  --danger-strong: #98130f;
+  --danger-soft: #ffdad6;
+  --shadow-soft: 0 12px 28px rgba(28, 27, 27, 0.12);
+  --primary-hover: #0f631b;
+  --summary-background: rgba(252, 249, 248, 0.96);
+  --tooltip-background: #1f2a1d;
+  --checkbox-check: #0a3909;
 }
 
 * {
@@ -354,7 +384,7 @@ h1 {
 .cart-back-button:hover,
 .cart-finish-button:hover,
 .cart-price-toggle:hover {
-  background: #3b6934;
+  background: var(--primary-hover);
 }
 
 .shopping-nav-button {
@@ -394,6 +424,35 @@ h1 {
   text-align: center;
 }
 
+.theme-toggle-button {
+  align-items: center;
+  background: var(--surface-high);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 40px;
+  justify-content: center;
+  min-height: 40px;
+  min-width: 40px;
+  padding: 0;
+  width: 40px;
+}
+
+.theme-toggle-button:hover,
+.theme-toggle-button[aria-pressed="true"] {
+  background: var(--surface-raised);
+  border-color: var(--border-strong);
+  color: var(--primary-strong);
+}
+
+.theme-toggle-button span {
+  font-size: 1rem;
+  line-height: 1;
+  transform: translateY(-0.5px);
+}
+
 .stats {
   align-items: center;
   display: flex;
@@ -415,7 +474,7 @@ h1 {
 }
 
 .summary-bar {
-  background: rgba(16, 17, 16, 0.88);
+  background: var(--summary-background);
   backdrop-filter: blur(14px);
   margin: 0 auto 16px;
   max-width: 1360px;
@@ -724,7 +783,7 @@ input[type="checkbox"] {
   background: transparent;
   border: 1px solid var(--border-strong);
   border-radius: 2px;
-  color: #0a3909;
+  color: var(--checkbox-check);
   display: inline-grid;
   flex: 0 0 auto;
   height: 14px;
@@ -736,7 +795,7 @@ input[type="checkbox"] {
 }
 
 input[type="checkbox"]::after {
-  color: #0a3909;
+  color: var(--checkbox-check);
   content: "✓";
   font-size: 0.62rem;
   font-weight: 900;
@@ -1069,7 +1128,7 @@ button {
 }
 
 button:hover {
-  background: #3b8b3e;
+  background: var(--primary-hover);
 }
 
 button:focus-visible {
@@ -1161,7 +1220,7 @@ button:focus-visible {
 }
 
 .action-help::after {
-  background: #0f160f;
+  background: var(--tooltip-background);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   bottom: calc(100% + 8px);
@@ -1191,7 +1250,7 @@ button:focus-visible {
 .action-help::before {
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
-  border-top: 5px solid #0f160f;
+  border-top: 5px solid var(--tooltip-background);
   bottom: calc(100% + 3px);
   content: "";
   left: 50%;

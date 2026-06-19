@@ -9,7 +9,7 @@
     "dev:backend": "cd backend-spring && mvn spring-boot:run",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "cd backend-spring && mvn spring-boot:run"
+    "start": "vite build && cd backend-spring && mvn spring-boot:run"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",

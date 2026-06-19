@@ -27,6 +27,7 @@ import { getQuantityNote, normalizeQuantityCount } from "./utils/quantity";
 
 const PRICE_FIELDS_STORAGE_KEY = "supermarket-show-price-fields";
 const ONBOARDING_DISMISSED_STORAGE_KEY = "supermarket-onboarding-dismissed";
+const THEME_STORAGE_KEY = "supermarket-theme";
 const MAX_HOME_SNAPSHOTS = 20;
 
 const VIEW_LABELS = {
@@ -63,6 +64,23 @@ function readStoredOnboardingDismissed() {
 function writeStoredOnboardingDismissed() {
   try {
     globalThis.localStorage?.setItem(ONBOARDING_DISMISSED_STORAGE_KEY, "true");
+  } catch {
+    // Local UI preference only; ignore unavailable storage.
+  }
+}
+
+function readStoredDarkMode() {
+  try {
+    const storedTheme = globalThis.localStorage?.getItem(THEME_STORAGE_KEY);
+    return storedTheme ? storedTheme === "dark" : true;
+  } catch {
+    return true;
+  }
+}
+
+function writeStoredDarkMode(isDarkMode) {
+  try {
+    globalThis.localStorage?.setItem(THEME_STORAGE_KEY, isDarkMode ? "dark" : "light");
   } catch {
     // Local UI preference only; ignore unavailable storage.
   }
@@ -566,6 +584,7 @@ function App() {
   const [pendingVoiceItems, setPendingVoiceItems] = useState([]);
   const [showPriceFields, setShowPriceFields] = useState(readStoredPriceFieldsVisibility);
   const [isOnboardingDismissed, setIsOnboardingDismissed] = useState(readStoredOnboardingDismissed);
+  const [isDarkMode, setIsDarkMode] = useState(readStoredDarkMode);
   const [statusNotices, setStatusNotices] = useState([]);
   const didFinishInitialLoad = useRef(false);
   const productsSectionRef = useRef(null);
@@ -669,6 +688,18 @@ function App() {
     setCartItemIds([]);
     writeCartSessionIds([]);
   }
+
+  function toggleDarkMode() {
+    setIsDarkMode((current) => {
+      const next = !current;
+      writeStoredDarkMode(next);
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    globalThis.document?.documentElement.setAttribute("data-theme", isDarkMode ? "dark" : "light");
+  }, [isDarkMode]);
 
   useEffect(() => {
     function syncRouteFromHash() {
@@ -1380,12 +1411,14 @@ function App() {
         totals={totals}
         user={authUser}
         view={view}
+        isDarkMode={isDarkMode}
         onCreateHousehold={handleCreateHousehold}
         onJoinHousehold={handleJoinHousehold}
         onLogout={handleLogout}
         onOpenCart={openShoppingCart}
         onRotateInvite={handleRotateInvite}
         onSwitchHousehold={switchHousehold}
+        onToggleDarkMode={toggleDarkMode}
         onViewChange={changeViewFromNavigation}
       />
 
