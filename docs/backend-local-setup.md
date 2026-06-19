@@ -149,6 +149,8 @@ When the Tailscale certificate is present, open the app from another device with
 https://desktop-de1g0tf.tail0276cd.ts.net:8787
 ```
 
+Set `TAILSCALE_HOST` in `.env` if your Tailscale DNS name is different; Spring logs that URL on startup.
+
 If no local certificate pair exists, Spring falls back to plain HTTP on the same port.
 
 ## First Legacy Import
