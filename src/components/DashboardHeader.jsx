@@ -19,7 +19,9 @@ export function DashboardHeader({
   onOpenCart,
   onRotateInvite,
   onSwitchHousehold,
+  onToggleDarkMode,
   onViewChange,
+  isDarkMode,
   totals,
   user,
   view,
@@ -66,6 +68,16 @@ export function DashboardHeader({
               ↪
             </button>
           </div>
+          <button
+            aria-label={isDarkMode ? "Απενεργοποίηση dark mode" : "Ενεργοποίηση dark mode"}
+            aria-pressed={isDarkMode}
+            className="theme-toggle-button"
+            title={isDarkMode ? "Light mode" : "Dark mode"}
+            type="button"
+            onClick={onToggleDarkMode}
+          >
+            <span aria-hidden="true">{isDarkMode ? "☀" : "☾"}</span>
+          </button>
           <button className="shopping-nav-button" type="button" onClick={onOpenCart} aria-label="Άνοιγμα καλαθιού supermarket">
             <span className="shopping-basket-icon" aria-hidden="true">
               <svg viewBox="0 0 32 32" focusable="false">
