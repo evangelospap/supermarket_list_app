@@ -60,8 +60,6 @@ export function ControlsPanel({
         <ProductScanner categories={categories} onAddScannedItem={onAddScannedItem} />
       </div>
 
-      <CategoryOrderPanel categories={categories} onMoveCategory={onMoveCategory} onRenameCategory={onRenameCategory} />
-
       <div className="secondary-actions">
         <button className="secondary-action danger" type="button" onClick={onClearCompleted}>
           <span className="button-icon" aria-hidden="true">🗑</span>
@@ -113,6 +111,8 @@ export function ControlsPanel({
           </span>
         </button>
       </div>
+
+      <CategoryOrderPanel categories={categories} onMoveCategory={onMoveCategory} onRenameCategory={onRenameCategory} />
 
       <HomeSnapshots
         snapshots={homeSnapshots}
