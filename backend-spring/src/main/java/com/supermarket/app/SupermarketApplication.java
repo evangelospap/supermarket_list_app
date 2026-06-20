@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -19,6 +20,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 @SpringBootApplication
 @EnableConfigurationProperties(AppProperties.class)
 public class SupermarketApplication {
+  private static final String DEFAULT_TAILSCALE_HOST = "desktop-de1g0tf.tail0276cd.ts.net";
+
   /**
    * Runs the Spring Boot application.
    *
@@ -41,13 +44,14 @@ public class SupermarketApplication {
   private static List<CertificatePair> localCertificatePairs() {
     Path certs = Path.of("certs");
     Path parentCerts = Path.of("..", "certs");
-    List<CertificatePair> pairs = new ArrayList<>(List.of(
+    List<CertificatePair> pairs = new ArrayList<>();
+    pairs.addAll(hostnamedTailscaleCertificatePairs(certs));
+    pairs.addAll(hostnamedTailscaleCertificatePairs(parentCerts));
+    pairs.addAll(List.of(
         new CertificatePair("tailscale", null, certs.resolve("tailscale-dev.pem"), certs.resolve("tailscale-dev-key.pem")),
         new CertificatePair("tailscale", null, parentCerts.resolve("tailscale-dev.pem"), parentCerts.resolve("tailscale-dev-key.pem")),
         new CertificatePair("local", null, certs.resolve("local-dev.pem"), certs.resolve("local-dev-key.pem")),
         new CertificatePair("local", null, parentCerts.resolve("local-dev.pem"), parentCerts.resolve("local-dev-key.pem"))));
-    pairs.addAll(hostnamedTailscaleCertificatePairs(certs));
-    pairs.addAll(hostnamedTailscaleCertificatePairs(parentCerts));
     return pairs;
   }
 
@@ -81,10 +85,16 @@ public class SupermarketApplication {
     properties.put("spring.ssl.bundle.pem.webserver.keystore.certificate", pair.certificate().toAbsolutePath().normalize().toUri().toString());
     properties.put("spring.ssl.bundle.pem.webserver.keystore.private-key", pair.privateKey().toAbsolutePath().normalize().toUri().toString());
     properties.put("app.local-certificate", pair.name());
-    if (pair.host() != null) {
-      properties.put("app.public-host", pair.host());
+    if ("tailscale".equals(pair.name())) {
+      properties.put("app.public-host", pair.host() != null ? pair.host() : tailscaleHost());
     }
     return properties;
+  }
+
+  private static String tailscaleHost() {
+    String host = Optional.ofNullable(System.getenv("TAILSCALE_HOST"))
+        .orElseGet(() -> System.getProperty("TAILSCALE_HOST", DEFAULT_TAILSCALE_HOST));
+    return host.trim().isBlank() ? DEFAULT_TAILSCALE_HOST : host.trim();
   }
 
   private record CertificatePair(String name, String host, Path certificate, Path privateKey) {}

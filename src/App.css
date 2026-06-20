@@ -20,12 +20,18 @@
   --danger-soft: rgba(147, 0, 10, 0.28);
   --shadow-soft: 0 4px 8px rgba(0, 0, 0, 0.5);
   --primary-hover: #3b6934;
-  --summary-background: rgba(16, 17, 16, 0.88);
+  --summary-background: rgba(16, 17, 16, 0.98);
   --tooltip-background: #0f160f;
   --checkbox-check: #0a3909;
   --radius-sm: 4px;
   --radius-md: 12px;
   --radius-lg: 16px;
+  --sticky-hero-top: 4px;
+  --sticky-summary-top: 68px;
+  --sticky-controls-top: 180px;
+  --z-sticky-header: 100;
+  --z-sticky-summary: 90;
+  --z-sticky-content: 1;
 
   color: var(--text);
   background: var(--background);
@@ -119,8 +125,8 @@ button {
   min-height: 56px;
   padding: 8px 14px;
   position: sticky;
-  top: 4px;
-  z-index: 30;
+  top: var(--sticky-hero-top);
+  z-index: var(--z-sticky-header);
 }
 
 .title-block {
@@ -480,8 +486,8 @@ h1 {
   max-width: 1360px;
   padding: 8px 0;
   position: sticky;
-  top: 68px;
-  z-index: 25;
+  top: var(--sticky-summary-top);
+  z-index: var(--z-sticky-summary);
 }
 
 .stat-card {
@@ -535,6 +541,8 @@ h1 {
   grid-template-columns: 320px 1fr;
   margin: 0 auto;
   max-width: 1360px;
+  position: relative;
+  z-index: var(--z-sticky-content);
 }
 
 .onboarding-hint {
@@ -597,7 +605,8 @@ h1 {
   gap: 16px;
   padding: 14px;
   position: sticky;
-  top: 180px;
+  top: var(--sticky-controls-top);
+  z-index: var(--z-sticky-content);
 }
 
 .section-label {
