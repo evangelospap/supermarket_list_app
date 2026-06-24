@@ -1182,6 +1182,14 @@ function App() {
     scrollToProductsOnMobile();
   }
 
+  function focusMobileAddItem() {
+    document.querySelector(".controls-panel")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+    window.requestAnimationFrame(() => document.getElementById("item-name")?.focus());
+  }
+
   function openShoppingCart() {
     const neededItemIds = state.items.filter((item) => item.status === "needed").map((item) => item.id);
     setCartItemIds(neededItemIds);
@@ -1420,6 +1428,7 @@ function App() {
         onSwitchHousehold={switchHousehold}
         onToggleDarkMode={toggleDarkMode}
         onViewChange={changeViewFromNavigation}
+        onFocusAddItem={focusMobileAddItem}
       />
 
       {!isOnboardingDismissed ? (
