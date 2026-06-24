@@ -5,6 +5,17 @@ const NAV_ITEMS = [
   { countKey: "all", label: "Όλα", view: "all" },
 ];
 
+const MOBILE_NAV_ICONS = {
+  all: "◇",
+  have: "□",
+  needed: "☰",
+  notNeeded: "×",
+};
+
+function getUserInitial(user) {
+  return (user?.displayName ?? user?.email ?? "?").trim().charAt(0).toUpperCase() || "?";
+}
+
 export function DashboardHeader({
   activeHouseholdId,
   authNotice,
@@ -13,9 +24,12 @@ export function DashboardHeader({
   onJoinHousehold,
   onLogout,
   onOpenCart,
+  onFocusAddItem,
   onRotateInvite,
   onSwitchHousehold,
+  onToggleDarkMode,
   onViewChange,
+  isDarkMode,
   totals,
   user,
   view,
@@ -27,13 +41,16 @@ export function DashboardHeader({
       <section className="hero">
         <div className="title-block">
           <p className="eyebrow">Supermarket GUI</p>
-          <h2>{activeHousehold?.name ?? "Λίστα supermarket"}</h2>
-          <p className="dashboard-note">Γρήγορη εικόνα αποθέματος, αγορών και σπιτιού.</p>
-        </div>
-
-        <div className="household-toolbar" aria-label="Σπίτια και λογαριασμός">
-          <label>
-            <span>Σπίτι</span>
+          <h2>{"Λίστα supermarket"}</h2>
+          <label className="household-select-pill">
+            <span className="household-home-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M4 11.5 12 5l8 6.5" />
+                <path d="M6.5 10.5V19h11v-8.5" />
+                <path d="M10 19v-5h4v5" />
+              </svg>
+            </span>
+            <span className="visually-hidden">Σπίτι</span>
             <select value={activeHouseholdId} onChange={(event) => onSwitchHousehold(event.target.value)}>
               {households.map((household) => (
                 <option key={household.id} value={household.id}>
@@ -42,21 +59,73 @@ export function DashboardHeader({
               ))}
             </select>
           </label>
+          <div className="user-avatar" title={user?.displayName ?? user?.email ?? "Χρήστης"} aria-label={user?.displayName ?? "Χρήστης"}>
+            {getUserInitial(user)}
+          </div>
+        </div>
+
+        <div className="household-toolbar" aria-label="Σπίτια και λογαριασμός">
           <div className="household-actions">
-            <button type="button" onClick={onCreateHousehold}>
-              Νέο
+            <button
+              aria-label="Νέο σπίτι"
+              data-tooltip="Δημιουργία νέου σπιτιού"
+              title="Δημιουργία νέου σπιτιού"
+              type="button"
+              onClick={onCreateHousehold}
+            >
+              +
             </button>
-            <button type="button" onClick={onJoinHousehold}>
-              Join
+            <button
+              aria-label="Join σε σπίτι"
+              data-tooltip="Σύνδεση σε σπίτι με κωδικό"
+              title="Σύνδεση σε σπίτι με κωδικό"
+              type="button"
+              onClick={onJoinHousehold}
+            >
+              ↗
             </button>
-            <button type="button" onClick={onRotateInvite}>
-              Κωδικός
+            <button
+              aria-label="Αλλαγή κωδικού πρόσκλησης"
+              data-tooltip="Αλλαγή κωδικού πρόσκλησης"
+              title="Αλλαγή κωδικού πρόσκλησης"
+              type="button"
+              onClick={onRotateInvite}
+            >
+              #
             </button>
-            <button type="button" onClick={onLogout}>
-              Έξοδος
+            <button
+              aria-label="Έξοδος"
+              data-tooltip="Έξοδος από τον λογαριασμό"
+              title="Έξοδος από τον λογαριασμό"
+              type="button"
+              onClick={onLogout}
+            >
+              ↪
             </button>
           </div>
-          <small>{user?.displayName}</small>
+          <button
+            aria-label={isDarkMode ? "Απενεργοποίηση dark mode" : "Ενεργοποίηση dark mode"}
+            aria-pressed={isDarkMode}
+            className="theme-toggle-button"
+            title={isDarkMode ? "Light mode" : "Dark mode"}
+            type="button"
+            onClick={onToggleDarkMode}
+          >
+            <span aria-hidden="true">{isDarkMode ? "☀" : "☾"}</span>
+          </button>
+          <button className="shopping-nav-button" type="button" onClick={onOpenCart} aria-label="Άνοιγμα καλαθιού supermarket">
+            <span className="shopping-basket-icon" aria-hidden="true">
+              <svg viewBox="0 0 32 32" focusable="false">
+                <path d="M10 13 15 6" />
+                <path d="m22 13-5-7" />
+                <path d="M6 13h20l-2 13H8L6 13Z" />
+                <path d="M11 17v5" />
+                <path d="M16 17v5" />
+                <path d="M21 17v5" />
+              </svg>
+            </span>
+            <span className="shopping-nav-label">Πάμε Σούπερ!</span>
+          </button>
           {authNotice ? <p>{authNotice}</p> : null}
         </div>
       </section>
@@ -78,21 +147,29 @@ export function DashboardHeader({
             ))}
           </div>
 
-          <button className="shopping-nav-button" type="button" onClick={onOpenCart} aria-label="Άνοιγμα καλαθιού supermarket">
-            <span className="shopping-basket-icon" aria-hidden="true">
-              <svg viewBox="0 0 32 32" focusable="false">
-                <path d="M10 13 15 6" />
-                <path d="m22 13-5-7" />
-                <path d="M6 13h20l-2 13H8L6 13Z" />
-                <path d="M11 17v5" />
-                <path d="M16 17v5" />
-                <path d="M21 17v5" />
-              </svg>
-            </span>
-            <span className="shopping-nav-label">Παμε Σουπερ!</span>
-          </button>
         </div>
       </section>
+
+      <button className="mobile-add-fab" type="button" onClick={onFocusAddItem} aria-label="Προσθήκη προϊόντος">
+        +
+      </button>
+
+      <nav className="mobile-bottom-nav" aria-label="Κάτω πλοήγηση">
+        {NAV_ITEMS.map((item) => (
+          <button
+            aria-pressed={view === item.view}
+            className={view === item.view ? "active" : ""}
+            key={item.view}
+            type="button"
+            onClick={() => onViewChange(item.view)}
+          >
+            <span className="mobile-nav-icon" aria-hidden="true">
+              {MOBILE_NAV_ICONS[item.view]}
+            </span>
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </nav>
     </>
   );
 }

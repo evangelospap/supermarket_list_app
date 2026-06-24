@@ -1,0 +1,162 @@
+@startuml household_backend_schema
+title Household Backend Database Schema
+
+hide circle
+skinparam linetype ortho
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam entity {
+  BackgroundColor #FAFAFA
+  BorderColor #555555
+  FontColor #222222
+}
+
+entity "app_users" as app_users {
+  * id : UUID <<PK>>
+  --
+  type : TEXT <<CHECK: GOOGLE, GUEST>>
+  google_sub : TEXT <<UNIQUE>>
+  email : TEXT
+  display_name : TEXT
+  avatar_url : TEXT
+  created_at : TIMESTAMPTZ
+  updated_at : TIMESTAMPTZ
+}
+
+entity "households" as households {
+  * id : UUID <<PK>>
+  --
+  name : TEXT
+  invite_code_hash : TEXT <<UNIQUE>>
+  invite_code_rotated_at : TIMESTAMPTZ
+  created_at : TIMESTAMPTZ
+  updated_at : TIMESTAMPTZ
+}
+
+entity "household_members" as household_members {
+  * household_id : UUID <<PK, FK>>
+  * user_id : UUID <<PK, FK>>
+  --
+  joined_at : TIMESTAMPTZ
+}
+
+entity "refresh_tokens" as refresh_tokens {
+  * token_hash : TEXT <<PK>>
+  --
+  user_id : UUID <<FK>>
+  expires_at : TIMESTAMPTZ
+  revoked_at : TIMESTAMPTZ
+  user_agent : TEXT
+  device_label : TEXT
+  created_at : TIMESTAMPTZ
+}
+
+entity "household_categories" as household_categories {
+  * id : UUID <<PK>>
+  --
+  household_id : UUID <<FK>>
+  name : TEXT
+  sort_order : INTEGER
+  created_at : TIMESTAMPTZ
+  updated_at : TIMESTAMPTZ
+  --
+  UNIQUE (household_id, name)
+  UNIQUE (household_id, sort_order)
+}
+
+entity "shopping_items" as shopping_items {
+  * id : UUID <<PK>>
+  --
+  household_id : UUID <<FK>>
+  category_id : UUID <<FK, NULLABLE>>
+  category_name : TEXT
+  name : TEXT
+  barcode : TEXT
+  status : TEXT <<CHECK: needed, notNeeded, have>>
+  quantity_count : INTEGER
+  quantity_note : TEXT
+  estimated_price : TEXT
+  created_at : TIMESTAMPTZ
+  updated_at : TIMESTAMPTZ
+}
+
+entity "home_snapshots" as home_snapshots {
+  * id : UUID <<PK>>
+  --
+  household_id : UUID <<FK>>
+  created_at : TIMESTAMPTZ
+}
+
+entity "home_snapshot_items" as home_snapshot_items {
+  * id : UUID <<PK>>
+  --
+  snapshot_id : UUID <<FK>>
+  source_item_id : UUID
+  barcode : TEXT
+  category_name : TEXT
+  name : TEXT
+  quantity_count : INTEGER
+  quantity_note : TEXT
+  estimated_price : TEXT
+  sort_order : INTEGER
+}
+
+entity "barcode_products" as barcode_products {
+  * barcode : TEXT <<PK>>
+  --
+  name : TEXT
+  brand : TEXT
+  quantity : TEXT
+  preferred_category : TEXT
+  source : TEXT
+  updated_at : TIMESTAMPTZ
+}
+
+entity "household_state_snapshots" as household_state_snapshots {
+  * household_id : UUID <<PK, FK>>
+  --
+  state_json : JSONB
+  version : BIGINT
+  updated_at : TIMESTAMPTZ
+}
+
+entity "household_events" as household_events {
+  * id : UUID <<PK>>
+  --
+  household_id : UUID <<FK>>
+  actor_user_id : UUID <<FK, NULLABLE>>
+  type : TEXT
+  summary : TEXT
+  payload : JSONB
+  occurred_at : TIMESTAMPTZ
+}
+
+households ||--o{ household_members : "ON DELETE CASCADE"
+app_users ||--o{ household_members : "ON DELETE CASCADE"
+
+app_users ||--o{ refresh_tokens : "ON DELETE CASCADE"
+
+households ||--o{ household_categories : "ON DELETE CASCADE"
+households ||--o{ shopping_items : "ON DELETE CASCADE"
+household_categories |o--o{ shopping_items : "ON DELETE SET NULL"
+
+households ||--o{ home_snapshots : "ON DELETE CASCADE"
+home_snapshots ||--o{ home_snapshot_items : "ON DELETE CASCADE"
+
+households ||--|| household_state_snapshots : "ON DELETE CASCADE"
+
+households ||--o{ household_events : "ON DELETE CASCADE"
+app_users |o--o{ household_events : "ON DELETE SET NULL"
+
+shopping_items ..> home_snapshot_items : "source_item_id snapshot copy (no FK)"
+barcode_products ..> shopping_items : "barcode lookup (no FK)"
+
+legend right
+  |= Index |= Columns |
+  | idx_members_user | household_members(user_id) |
+  | idx_items_household | shopping_items(household_id) |
+  | idx_items_barcode | shopping_items(barcode) |
+  | idx_events_household_time | household_events(household_id, occurred_at DESC) |
+endlegend
+
+@enduml
