@@ -5,6 +5,13 @@ const NAV_ITEMS = [
   { countKey: "all", label: "Όλα", view: "all" },
 ];
 
+const MOBILE_NAV_ICONS = {
+  all: "◇",
+  have: "□",
+  needed: "☰",
+  notNeeded: "×",
+};
+
 function getUserInitial(user) {
   return (user?.displayName ?? user?.email ?? "?").trim().charAt(0).toUpperCase() || "?";
 }
@@ -17,6 +24,7 @@ export function DashboardHeader({
   onJoinHousehold,
   onLogout,
   onOpenCart,
+  onFocusAddItem,
   onRotateInvite,
   onSwitchHousehold,
   onToggleDarkMode,
@@ -51,20 +59,47 @@ export function DashboardHeader({
               ))}
             </select>
           </label>
+          <div className="user-avatar" title={user?.displayName ?? user?.email ?? "Χρήστης"} aria-label={user?.displayName ?? "Χρήστης"}>
+            {getUserInitial(user)}
+          </div>
         </div>
 
         <div className="household-toolbar" aria-label="Σπίτια και λογαριασμός">
           <div className="household-actions">
-            <button aria-label="Νέο σπίτι" title="Νέο σπίτι" type="button" onClick={onCreateHousehold}>
+            <button
+              aria-label="Νέο σπίτι"
+              data-tooltip="Δημιουργία νέου σπιτιού"
+              title="Δημιουργία νέου σπιτιού"
+              type="button"
+              onClick={onCreateHousehold}
+            >
               +
             </button>
-            <button aria-label="Join σε σπίτι" title="Join σε σπίτι" type="button" onClick={onJoinHousehold}>
+            <button
+              aria-label="Join σε σπίτι"
+              data-tooltip="Σύνδεση σε σπίτι με κωδικό"
+              title="Σύνδεση σε σπίτι με κωδικό"
+              type="button"
+              onClick={onJoinHousehold}
+            >
               ↗
             </button>
-            <button aria-label="Αλλαγή κωδικού πρόσκλησης" title="Κωδικός πρόσκλησης" type="button" onClick={onRotateInvite}>
+            <button
+              aria-label="Αλλαγή κωδικού πρόσκλησης"
+              data-tooltip="Αλλαγή κωδικού πρόσκλησης"
+              title="Αλλαγή κωδικού πρόσκλησης"
+              type="button"
+              onClick={onRotateInvite}
+            >
               #
             </button>
-            <button aria-label="Έξοδος" title="Έξοδος" type="button" onClick={onLogout}>
+            <button
+              aria-label="Έξοδος"
+              data-tooltip="Έξοδος από τον λογαριασμό"
+              title="Έξοδος από τον λογαριασμό"
+              type="button"
+              onClick={onLogout}
+            >
               ↪
             </button>
           </div>
@@ -91,9 +126,6 @@ export function DashboardHeader({
             </span>
             <span className="shopping-nav-label">Πάμε Σούπερ!</span>
           </button>
-          <div className="user-avatar" title={user?.displayName ?? user?.email ?? "Χρήστης"} aria-label={user?.displayName ?? "Χρήστης"}>
-            {getUserInitial(user)}
-          </div>
           {authNotice ? <p>{authNotice}</p> : null}
         </div>
       </section>
@@ -117,6 +149,27 @@ export function DashboardHeader({
 
         </div>
       </section>
+
+      <button className="mobile-add-fab" type="button" onClick={onFocusAddItem} aria-label="Προσθήκη προϊόντος">
+        +
+      </button>
+
+      <nav className="mobile-bottom-nav" aria-label="Κάτω πλοήγηση">
+        {NAV_ITEMS.map((item) => (
+          <button
+            aria-pressed={view === item.view}
+            className={view === item.view ? "active" : ""}
+            key={item.view}
+            type="button"
+            onClick={() => onViewChange(item.view)}
+          >
+            <span className="mobile-nav-icon" aria-hidden="true">
+              {MOBILE_NAV_ICONS[item.view]}
+            </span>
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </nav>
     </>
   );
 }

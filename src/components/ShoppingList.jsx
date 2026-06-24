@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { getCategoryIcon } from "../utils/categories";
 import { formatEuroAmount, getEstimatedLineTotal, parseEstimatedPrice } from "../utils/price";
 import { getQuantityNote, normalizeQuantityCount } from "../utils/quantity";
@@ -15,7 +15,7 @@ function isMobileViewport() {
 
 function readCollapsedCategories(categoryNames = []) {
   if (isMobileViewport()) {
-    return new Set(categoryNames);
+    return new Set();
   }
 
   try {
@@ -345,18 +345,7 @@ export function ShoppingList({
   showPriceFields,
 }) {
   const categoryNames = itemsByCategory.map((group) => group.category);
-  const categoryKey = categoryNames.join("|");
-  const didApplyMobileDefault = useRef(categoryNames.length > 0);
   const [collapsedCategories, setCollapsedCategories] = useState(() => readCollapsedCategories(categoryNames));
-
-  useEffect(() => {
-    if (didApplyMobileDefault.current || !isMobileViewport() || categoryNames.length === 0) {
-      return;
-    }
-
-    didApplyMobileDefault.current = true;
-    setCollapsedCategories(new Set(categoryNames));
-  }, [categoryKey, categoryNames]);
 
   function toggleCategoryCollapsed(category) {
     setCollapsedCategories((current) => {
