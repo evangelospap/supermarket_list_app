@@ -2819,7 +2819,7 @@ button:focus-visible {
     min-height: 36px;
     padding: 7px 10px;
     white-space: normal;
-    width: clamp(126px, 38vw, 148px);
+    width: clamp(130px, 39vw, 152px);
   }
 
   .shopping-nav-label {
